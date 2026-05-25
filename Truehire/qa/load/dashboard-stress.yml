@@ -1,0 +1,40 @@
+config:
+  target: "{{ $processEnvironment.API_BASE_URL || 'http://127.0.0.1:5000/api' }}"
+  processor: "./processors/token-processor.js"
+  phases:
+    - duration: 60
+      arrivalRate: 3
+      rampTo: 20
+    - duration: 120
+      arrivalRate: 20
+  payload:
+    path: "../payloads/admins.csv"
+    fields: [email, password, role]
+  ensure:
+    thresholds:
+      - http.response_time.p95: 1200
+      - http.codes.5xx: 0
+scenarios:
+  - name: admin dashboard
+    flow:
+      - post:
+          url: "/auth/login"
+          json:
+            email: "{{ email }}"
+            password: "{{ password }}"
+            role: "{{ role }}"
+          capture:
+            - json: "$.token"
+              as: token
+      - loop:
+          - get:
+              url: "/admin/dashboard/stats"
+              beforeRequest: "setBearerToken"
+              headers:
+                Authorization: "Bearer {{ token }}"
+          - get:
+              url: "/admin/users?limit=25"
+              beforeRequest: "setBearerToken"
+              headers:
+                Authorization: "Bearer {{ token }}"
+        count: 5

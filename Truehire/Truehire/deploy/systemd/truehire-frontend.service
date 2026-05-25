@@ -1,0 +1,16 @@
+[Unit]
+Description=TrueHire frontend
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/truehire/Truehire/frontend
+EnvironmentFile=/etc/truehire/frontend.env
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+

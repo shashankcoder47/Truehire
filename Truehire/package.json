@@ -1,0 +1,48 @@
+{
+  "name": "truehire-qa-automation",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Enterprise QA automation, API, security, and performance test framework for TrueHire Job Portal.",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test qa/tests/ui",
+    "test:api": "playwright test qa/tests/api",
+    "test:api:advanced": "playwright test qa/tests/api/auth-advanced.api.spec.js qa/tests/api/jobs-advanced.api.spec.js qa/tests/api/applications-advanced.api.spec.js qa/tests/api/payments-advanced.api.spec.js qa/tests/api/admin-advanced.api.spec.js",
+    "test:security": "playwright test qa/tests/security",
+    "test:security:advanced": "playwright test qa/tests/security/security-advanced.spec.js",
+    "test:unit": "npm run test:unit --prefix Truehire/backend",
+    "test:chrome": "playwright test --project=chromium",
+    "test:firefox": "playwright test --project=firefox",
+    "test:webkit": "playwright test --project=webkit",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "report:html": "playwright show-report qa/reports/playwright-html",
+    "report:allure:generate": "allure generate qa/reports/allure-results --clean -o qa/reports/allure-report",
+    "report:allure:open": "allure open qa/reports/allure-report",
+    "load": "artillery run qa/load/artillery.yml --output qa/reports/artillery/load-report.json",
+    "load:report": "artillery report qa/reports/artillery/load-report.json --output qa/reports/artillery/load-report.html",
+    "load:login": "artillery run qa/load/login-load.yml --output qa/reports/artillery/login-report.json",
+    "load:jobs": "artillery run qa/load/job-search-load.yml --output qa/reports/artillery/job-search-report.json",
+    "load:apply": "artillery run qa/load/job-apply-stress.yml --output qa/reports/artillery/job-apply-report.json",
+    "load:dashboard": "artillery run qa/load/dashboard-stress.yml --output qa/reports/artillery/dashboard-report.json",
+    "load:payments": "artillery run qa/load/payment-load.yml --output qa/reports/artillery/payment-report.json",
+    "qa:install": "npm install && npx playwright install --with-deps"
+  },
+  "keywords": [
+    "playwright",
+    "artillery",
+    "allure",
+    "truehire",
+    "qa"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "@types/node": "^25.6.0",
+    "allure-commandline": "^2.34.1",
+    "allure-playwright": "^3.4.1",
+    "artillery": "^2.0.27"
+  }
+}

@@ -1,0 +1,1004 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model admins {
+  id         BigInt    @id @default(autoincrement())
+  name       String    @db.VarChar(100)
+  email      String    @unique(map: "email") @db.VarChar(150)
+  password   String    @db.VarChar(255)
+  role       String    @default("ADMIN") @db.VarChar(50)
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  updated_at DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model application_conversations {
+  id                             BigInt                 @id @default(autoincrement())
+  application_id                 BigInt
+  job_id                         BigInt
+  recruiter_id                   BigInt
+  user_id                        BigInt
+  last_message_id                BigInt?
+  last_message_at                DateTime?              @db.DateTime(0)
+  recruiter_notes                String?                @db.Text
+  user_unread_email_sent_at      DateTime?              @db.DateTime(0)
+  recruiter_unread_email_sent_at DateTime?              @db.DateTime(0)
+  user_last_seen_message_id      BigInt?
+  user_seen_at                   DateTime?              @db.DateTime(0)
+  recruiter_last_seen_message_id BigInt?
+  recruiter_seen_at              DateTime?              @db.DateTime(0)
+  created_at                     DateTime?              @default(now()) @db.Timestamp(0)
+  updated_at                     DateTime?              @default(now()) @db.Timestamp(0)
+  job_applications               job_applications       @relation(fields: [application_id], references: [id], onDelete: Cascade, map: "fk_appconv_application")
+  jobs                           jobs                   @relation(fields: [job_id], references: [id], onDelete: Cascade, map: "fk_appconv_job")
+  recruiters                     recruiters             @relation(fields: [recruiter_id], references: [id], onDelete: Cascade, map: "fk_appconv_recruiter")
+  users                          users                  @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "fk_appconv_user")
+  application_messages           application_messages[]
+
+  @@index([application_id], map: "idx_appconv_application")
+  @@index([job_id], map: "idx_appconv_job")
+  @@index([recruiter_id], map: "idx_appconv_recruiter")
+  @@index([user_id], map: "idx_appconv_user")
+}
+
+model application_message_attachments {
+  id                   BigInt               @id @default(autoincrement())
+  message_id           BigInt
+  file_path            String               @db.VarChar(500)
+  file_name            String               @db.VarChar(255)
+  file_type            String?              @db.VarChar(100)
+  file_size            BigInt?
+  created_at           DateTime?            @default(now()) @db.Timestamp(0)
+  application_messages application_messages @relation(fields: [message_id], references: [id], onDelete: Cascade, map: "fk_app_msg_attach_message")
+
+  @@index([message_id], map: "idx_app_msg_attach_message")
+}
+
+model application_messages {
+  id                              BigInt                               @id @default(autoincrement())
+  conversation_id                 BigInt
+  application_id                  BigInt
+  job_id                          BigInt
+  sender_id                       BigInt
+  sender_role                     application_messages_sender_role
+  receiver_id                     BigInt
+  receiver_role                   application_messages_receiver_role
+  message                         String                               @db.Text
+  read_status                     Boolean?                             @default(false)
+  read_at                         DateTime?                            @db.DateTime(0)
+  is_pinned                       Boolean?                             @default(false)
+  pinned_at                       DateTime?                            @db.DateTime(0)
+  pinned_by_role                  application_messages_pinned_by_role?
+  pinned_by_id                    BigInt?
+  created_at                      DateTime?                            @default(now()) @db.Timestamp(0)
+  application_message_attachments application_message_attachments[]
+  job_applications                job_applications                     @relation(fields: [application_id], references: [id], onDelete: Cascade, map: "fk_app_messages_application")
+  application_conversations       application_conversations            @relation(fields: [conversation_id], references: [id], onDelete: Cascade, map: "fk_app_messages_conversation")
+  jobs                            jobs                                 @relation(fields: [job_id], references: [id], onDelete: Cascade, map: "fk_app_messages_job")
+
+  @@index([application_id], map: "idx_app_messages_application")
+  @@index([conversation_id], map: "idx_app_messages_conversation")
+  @@index([job_id], map: "idx_app_messages_job")
+  @@index([read_status], map: "idx_app_messages_read")
+  @@index([receiver_id], map: "idx_app_messages_receiver")
+  @@index([sender_id], map: "idx_app_messages_sender")
+}
+
+model applications {
+  id                         BigInt                    @id @default(autoincrement())
+  job_id                     BigInt
+  user_id                    BigInt
+  name                       String                    @db.VarChar(150)
+  email                      String                    @db.VarChar(150)
+  phone                      String?                   @db.VarChar(20)
+  location                   String?                   @db.VarChar(150)
+  experience_level           String?                   @db.VarChar(100)
+  current_salary             Decimal?                  @db.Decimal(12, 2)
+  expected_salary            Decimal?                  @db.Decimal(12, 2)
+  notice_period              Int?
+  additional_comments        String?                   @db.Text
+  resume_path                String?                   @db.VarChar(500)
+  match_score                Int?
+  matched_skills             String?                   @db.Text
+  missing_skills             String?                   @db.Text
+  match_status               String?                   @default("MATCHED") @db.VarChar(30)
+  applied_at                 DateTime?                 @default(now()) @db.DateTime(0)
+  recruiter_last_action_at   DateTime?                 @db.DateTime(0)
+  smart_suggestion_triggered Boolean?                  @default(false)
+  smart_timer_started_at     DateTime?                 @db.DateTime(0)
+  created_at                 DateTime?                 @default(now()) @db.Timestamp(0)
+  updated_at                 DateTime?                 @default(now()) @db.Timestamp(0)
+  jobs                       jobs                      @relation(fields: [job_id], references: [id], onDelete: Cascade, map: "fk_app_job")
+  users                      users                     @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "fk_app_user")
+  recruiter_notifications    recruiter_notifications[]
+  user_notifications         user_notifications[]
+
+  @@index([email], map: "idx_app_email")
+  @@index([job_id], map: "idx_app_job")
+  @@index([user_id], map: "idx_app_user")
+}
+
+model banner_images {
+  id            BigInt        @id @default(autoincrement())
+  title         String        @db.VarChar(200)
+  image_path    String        @db.VarChar(500)
+  image_url     String?       @db.VarChar(500)
+  is_active     Boolean?      @default(true)
+  display_order Int?          @default(0)
+  uploaded_by   BigInt?
+  created_at    DateTime?     @default(now()) @db.Timestamp(0)
+  updated_at    DateTime?     @default(now()) @db.Timestamp(0)
+  super_admins  super_admins? @relation(fields: [uploaded_by], references: [id], map: "fk_banner_uploaded_by")
+
+  @@index([uploaded_by], map: "fk_banner_uploaded_by")
+  @@index([is_active], map: "idx_banner_active")
+  @@index([display_order], map: "idx_banner_display_order")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model certifications {
+  id                   BigInt    @id @default(autoincrement())
+  user_id              BigInt
+  certification_name   String    @db.VarChar(200)
+  issuing_organization String?   @db.VarChar(200)
+  issue_date           DateTime? @db.Date
+  expiry_date          DateTime? @db.Date
+  credential_id        String?   @db.VarChar(150)
+  credential_url       String?   @db.VarChar(300)
+  created_at           DateTime? @default(now()) @db.Timestamp(0)
+  updated_at           DateTime? @default(now()) @db.Timestamp(0)
+  users                users     @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "fk_certifications_user")
+
+  @@index([issue_date], map: "idx_certifications_issue_date")
+  @@index([certification_name], map: "idx_certifications_name")
+  @@index([user_id], map: "idx_certifications_user")
+}
+
+model companies {
+  id                    BigInt     @id @default(autoincrement())
+  recruiter_id          BigInt
+  company_name          String     @db.VarChar(200)
+  company_type          String?    @db.VarChar(100)
+  industry              String?    @db.VarChar(150)
+  company_size          String?    @db.VarChar(100)
+  year_founded          Int?       @db.Year
+  official_email        String?    @db.VarChar(150)
+  phone_number          String?    @db.VarChar(20)
+  website               String?    @db.VarChar(300)
+  headquarters_location String?    @db.VarChar(200)
+  short_overview        String?    @db.Text
+  detailed_description  String?    @db.Text
+  company_logo          String?    @db.VarChar(500)
+  linkedin              String?    @db.VarChar(300)
+  instagram             String?    @db.VarChar(300)
+  facebook              String?    @db.VarChar(300)
+  profile_complete      Boolean?   @default(false)
+  created_at            DateTime?  @default(now()) @db.Timestamp(0)
+  updated_at            DateTime?  @default(now()) @db.Timestamp(0)
+  recruiters            recruiters @relation(fields: [recruiter_id], references: [id], onDelete: Cascade, map: "fk_companies_recruiter")
+
+  @@index([industry], map: "idx_companies_industry")
+  @@index([company_name], map: "idx_companies_name")
+  @@index([recruiter_id], map: "idx_companies_recruiter")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model company_ratings {
+  id         BigInt     @id @default(autoincrement())
+  company_id BigInt
+  user_id    BigInt
+  rating     Int
+  created_at DateTime?  @default(now()) @db.Timestamp(0)
+  updated_at DateTime?  @default(now()) @db.Timestamp(0)
+  recruiters recruiters @relation(fields: [company_id], references: [id], onDelete: Cascade, map: "fk_company_ratings_company")
+  users      users      @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "fk_company_ratings_user")
+
+  @@unique([company_id, user_id], map: "unique_company_user")
+  @@index([company_id], map: "idx_company_ratings_company")
+  @@index([rating], map: "idx_company_ratings_rating")
+  @@index([user_id], map: "idx_company_ratings_user")
+}
+
+model favourite_companies {
+  id         BigInt    @id @default(autoincrement())
+  user_id    BigInt
+  company_id BigInt
+  created_at DateTime? @default(now()) @db.DateTime(0)
+
+  @@unique([user_id, company_id], map: "uniq_user_company")
+  @@index([company_id], map: "idx_company")
+  @@index([user_id], map: "idx_user")
+}
+
+model favourite_notifications {
+  id          BigInt                               @id @default(autoincrement())
+  user_id     BigInt
+  type        favourite_notifications_type
+  title       String                               @db.VarChar(255)
+  message     String                               @db.Text
+  entity_type favourite_notifications_entity_type? @default(JOB)
+  entity_id   BigInt?
+  is_read     Boolean?                             @default(false)
+  created_at  DateTime?                            @default(now()) @db.DateTime(0)
+
+  @@index([created_at], map: "idx_created")
+  @@index([user_id, is_read], map: "idx_read")
+  @@index([user_id], map: "idx_user")
+}
+
+model introduction_videos {
+  id               BigInt           @id @default(autoincrement())
+  application_id   BigInt
+  user_id          BigInt
+  job_id           BigInt
+  recruiter_id     BigInt
+  file_name        String           @db.VarChar(255)
+  file_path        String           @db.VarChar(500)
+  file_size        BigInt?
+  duration_seconds Int?
+  uploaded_at      DateTime?        @default(now()) @db.DateTime(0)
+  created_at       DateTime?        @default(now()) @db.Timestamp(0)
+  updated_at       DateTime?        @default(now()) @db.Timestamp(0)
+  job_applications job_applications @relation(fields: [application_id], references: [id], onDelete: Cascade, map: "fk_intro_videos_application")
+  jobs             jobs             @relation(fields: [job_id], references: [id], onDelete: Cascade, map: "fk_intro_videos_job")
+  recruiters       recruiters       @relation(fields: [recruiter_id], references: [id], onDelete: Cascade, map: "fk_intro_videos_recruiter")
+  users            users            @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "fk_intro_videos_user")
+
+  @@index([application_id], map: "idx_intro_videos_application")
+  @@index([job_id], map: "idx_intro_videos_job")
+  @@index([recruiter_id], map: "idx_intro_videos_recruiter")
+  @@index([user_id], map: "idx_intro_videos_user")
+}
+
+model job_applications {
+  id                         BigInt                      @id @default(autoincrement())
+  job_id                     BigInt
+  user_id                    BigInt
+  status                     job_applications_status?    @default(APPLIED)
+  applied_at                 DateTime?                   @default(now()) @db.DateTime(0)
+  notes                      String?                     @db.Text
+  total_view_seconds         Int?                        @default(0)
+  rejection_reason           String?                     @db.Text
+  recruiter_last_action_at   DateTime?                   @db.DateTime(0)
+  smart_timer_started_at     DateTime?                   @db.DateTime(0)
+  smart_suggestion_triggered Boolean?                    @default(false)
+  updated_at                 DateTime?                   @default(now()) @db.Timestamp(0)
+  application_conversations  application_conversations[]
+  application_messages       application_messages[]
+  introduction_videos        introduction_videos[]
+  jobs                       jobs                        @relation(fields: [job_id], references: [id], onDelete: Cascade, map: "fk_job_applications_job")
+  users                      users                       @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "fk_job_applications_user")
+
+  @@unique([job_id, user_id], map: "unique_job_user")
+  @@index([job_id], map: "idx_job_applications_job")
+  @@index([status], map: "idx_job_applications_status")
+  @@index([user_id], map: "idx_job_applications_user")
+}
+
+model jobs {
+  id                            BigInt                      @id @default(autoincrement())
+  recruiter_id                  BigInt
+  title                         String                      @db.VarChar(200)
+  company                       String?                     @db.VarChar(200)
+  location                      String?                     @db.VarChar(150)
+  employment_type               String?                     @db.VarChar(50)
+  experience_level              jobs_experience_level?
+  salary_min                    Decimal?                    @db.Decimal(12, 2)
+  salary_max                    Decimal?                    @db.Decimal(12, 2)
+  salary_currency               String?                     @default("INR") @db.VarChar(10)
+  description                   String?                     @db.Text
+  requirements                  String?                     @db.Text
+  benefits                      String?                     @db.Text
+  skills_required               String?                     @db.Text
+  min_experience_years          Decimal?                    @db.Decimal(4, 1)
+  match_percentage              Int?                        @default(0)
+  application_deadline          DateTime?                   @db.Date
+  status                        jobs_status?                @default(DRAFT)
+  is_featured                   Boolean?                    @default(false)
+  is_urgent                     Boolean?                    @default(false)
+  views_count                   Int?                        @default(0)
+  applications_count            Int?                        @default(0)
+  deadline_notification_sent_at DateTime?                   @db.DateTime(0)
+  created_at                    DateTime?                   @default(now()) @db.Timestamp(0)
+  updated_at                    DateTime?                   @default(now()) @db.Timestamp(0)
+  closed_at                     DateTime?                   @db.DateTime(0)
+  company_logo                  String?                     @db.VarChar(500)
+  max_applicants                Int?
+  application_conversations     application_conversations[]
+  application_messages          application_messages[]
+  applications                  applications[]
+  introduction_videos           introduction_videos[]
+  job_applications              job_applications[]
+  recruiters                    recruiters                  @relation(fields: [recruiter_id], references: [id], onDelete: Cascade, map: "fk_jobs_recruiter")
+  saved_jobs                    saved_jobs[]
+
+  @@index([location], map: "idx_jobs_location")
+  @@index([recruiter_id], map: "idx_jobs_recruiter")
+  @@index([status], map: "idx_jobs_status")
+}
+
+model migrations {
+  id     BigInt   @id @default(autoincrement())
+  name   String   @unique(map: "name") @db.VarChar(255)
+  run_on DateTime @default(now()) @db.DateTime(0)
+
+  @@index([name], map: "idx_migrations_name")
+  @@index([run_on], map: "idx_migrations_run_on")
+}
+
+model notifications {
+  id             BigInt                       @id @default(autoincrement())
+  type           String                       @db.VarChar(100)
+  title          String                       @db.VarChar(200)
+  message        String                       @db.Text
+  recipient_type notifications_recipient_type
+  recipient_ids  Json?
+  status         notifications_status?        @default(DRAFT)
+  sent_at        DateTime?                    @db.DateTime(0)
+  created_by     BigInt?
+  created_at     DateTime?                    @default(now()) @db.Timestamp(0)
+  updated_at     DateTime?                    @default(now()) @db.Timestamp(0)
+
+  @@index([recipient_type], map: "idx_notifications_recipient_type")
+  @@index([sent_at], map: "idx_notifications_sent_at")
+  @@index([status], map: "idx_notifications_status")
+  @@index([type], map: "idx_notifications_type")
+}
+
+model otp_codes {
+  id         BigInt    @id @default(autoincrement())
+  email      String    @db.VarChar(150)
+  otp_code   String    @db.VarChar(10)
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  expires_at DateTime  @db.DateTime(0)
+
+  @@index([email], map: "idx_otp_email")
+  @@index([expires_at], map: "idx_otp_expires")
+}
+
+model payments {
+  id                  BigInt              @id @default(autoincrement())
+  recruiter_id        BigInt
+  plan_id             BigInt?
+  amount              Decimal             @db.Decimal(12, 2)
+  currency            String?             @default("INR") @db.VarChar(10)
+  payment_method      String?             @db.VarChar(100)
+  transaction_id      String?             @unique(map: "transaction_id") @db.VarChar(255)
+  status              payments_status?    @default(PENDING)
+  description         String?             @db.Text
+  invoice_url         String?             @db.VarChar(500)
+  paid_at             DateTime?           @db.DateTime(0)
+  razorpay_order_id   String?             @db.VarChar(255)
+  razorpay_payment_id String?             @db.VarChar(255)
+  created_at          DateTime?           @default(now()) @db.Timestamp(0)
+  updated_at          DateTime?           @default(now()) @db.Timestamp(0)
+  subscription_plans  subscription_plans? @relation(fields: [plan_id], references: [id], onDelete: Restrict, map: "fk_payments_plan")
+  recruiters          recruiters          @relation(fields: [recruiter_id], references: [id], onDelete: Cascade, map: "fk_payments_recruiter")
+
+  @@index([plan_id], map: "idx_payments_plan")
+  @@index([recruiter_id], map: "idx_payments_recruiter")
+  @@index([status], map: "idx_payments_status")
+  @@index([transaction_id], map: "idx_payments_transaction")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model projects {
+  id                  BigInt    @id @default(autoincrement())
+  user_id             BigInt
+  title               String    @db.VarChar(200)
+  description         String?   @db.Text
+  technologies_used   String?   @db.Text
+  start_date          DateTime? @db.Date
+  end_date            DateTime? @db.Date
+  role_responsibility String?   @db.Text
+  achievements        String?   @db.Text
+  github_link         String?   @db.VarChar(300)
+  live_link           String?   @db.VarChar(300)
+  screenshots         Json?
+  is_featured         Boolean?  @default(false)
+  created_at          DateTime? @default(now()) @db.Timestamp(0)
+  updated_at          DateTime? @default(now()) @db.Timestamp(0)
+  users               users     @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "fk_projects_user")
+
+  @@index([start_date, end_date], map: "idx_projects_dates")
+  @@index([is_featured], map: "idx_projects_featured")
+  @@index([user_id], map: "idx_projects_user")
+}
+
+model recruiter_activity_logs {
+  id               BigInt     @id @default(autoincrement())
+  recruiter_id     BigInt
+  action_type      String     @db.VarChar(100)
+  entity_type      String?    @db.VarChar(100)
+  entity_id        BigInt?
+  duration_seconds Int?
+  metadata         Json?
+  created_at       DateTime?  @default(now()) @db.Timestamp(0)
+  recruiters       recruiters @relation(fields: [recruiter_id], references: [id], onDelete: Cascade, map: "fk_recruiter_activity_recruiter")
+
+  @@index([action_type], map: "idx_recruiter_activity_action")
+  @@index([created_at], map: "idx_recruiter_activity_created")
+  @@index([entity_type, entity_id], map: "idx_recruiter_activity_entity")
+  @@index([recruiter_id], map: "idx_recruiter_activity_recruiter")
+}
+
+model recruiter_notifications {
+  id             BigInt        @id @default(autoincrement())
+  recruiter_id   BigInt
+  type           String        @db.VarChar(100)
+  title          String        @db.VarChar(200)
+  message        String        @db.Text
+  application_id BigInt?
+  is_read        Boolean?      @default(false)
+  created_at     DateTime?     @default(now()) @db.Timestamp(0)
+  applications   applications? @relation(fields: [application_id], references: [id], map: "fk_recruiter_notifications_application")
+  recruiters     recruiters    @relation(fields: [recruiter_id], references: [id], onDelete: Cascade, map: "fk_recruiter_notifications_recruiter")
+
+  @@index([application_id], map: "idx_recruiter_notifications_application")
+  @@index([is_read], map: "idx_recruiter_notifications_read")
+  @@index([recruiter_id], map: "idx_recruiter_notifications_recruiter")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model recruiter_subscriptions {
+  id                 BigInt                                  @id @default(autoincrement())
+  recruiter_id       BigInt
+  plan_id            BigInt
+  start_date         DateTime                                @db.Date
+  end_date           DateTime                                @db.Date
+  status             recruiter_subscriptions_status?         @default(PENDING)
+  payment_status     recruiter_subscriptions_payment_status? @default(UNPAID)
+  created_at         DateTime?                               @default(now()) @db.Timestamp(0)
+  subscription_plans subscription_plans                      @relation(fields: [plan_id], references: [id], map: "fk_recruiter_subscription_plan")
+  recruiters         recruiters                              @relation(fields: [recruiter_id], references: [id], onDelete: Cascade, map: "fk_recruiter_subscription_recruiter")
+
+  @@index([plan_id], map: "idx_recruiter_subscription_plan")
+  @@index([recruiter_id], map: "idx_recruiter_subscription_recruiter")
+  @@index([status], map: "idx_recruiter_subscription_status")
+}
+
+model recruiter_verification_documents {
+  id               BigInt                                   @id @default(autoincrement())
+  recruiter_id     BigInt
+  doc_type         String                                   @db.VarChar(100)
+  file_path        String                                   @db.VarChar(500)
+  status           recruiter_verification_documents_status? @default(PENDING)
+  rejection_reason String?                                  @db.Text
+  created_at       DateTime?                                @default(now()) @db.Timestamp(0)
+  updated_at       DateTime?                                @default(now()) @db.Timestamp(0)
+  reviewed_at      DateTime?                                @db.DateTime(0)
+  company_image    String?                                  @db.VarChar(255)
+  recruiters       recruiters                               @relation(fields: [recruiter_id], references: [id], onDelete: Cascade, map: "fk_recruiter_docs_recruiter")
+
+  @@index([recruiter_id], map: "idx_recruiter_docs_recruiter")
+  @@index([status], map: "idx_recruiter_docs_status")
+}
+
+model recruiters {
+  id                               BigInt                             @id @default(autoincrement())
+  recruiter_id                     String?                            @unique(map: "recruiter_id") @db.VarChar(100)
+  name                             String                             @db.VarChar(150)
+  email                            String                             @unique(map: "email") @db.VarChar(150)
+  password                         String?                            @db.VarChar(255)
+  company                          String?                            @db.VarChar(200)
+  role                             recruiters_role?                   @default(RECRUITER)
+  status                           recruiters_status?                 @default(ACTIVE)
+  profile_complete                 Boolean?                           @default(false)
+  job_post_limit                   Int?                               @default(0)
+  subscription_status              recruiters_subscription_status?
+  subscription_expiry              DateTime?                          @db.Date
+  sub_recruiters                   Int?                               @default(0)
+  company_name                     String?                            @db.VarChar(200)
+  company_type                     String?                            @db.VarChar(100)
+  category                         String?                            @db.VarChar(150)
+  industry                         String?                            @db.VarChar(150)
+  company_size                     String?                            @db.VarChar(100)
+  year_founded                     Int?                               @db.Year
+  official_email                   String?                            @db.VarChar(150)
+  phone_number                     String?                            @db.VarChar(20)
+  website                          String?                            @db.VarChar(300)
+  headquarters_location            String?                            @db.VarChar(200)
+  short_overview                   String?                            @db.Text
+  detailed_description             String?                            @db.Text
+  company_logo                     String?                            @db.VarChar(500)
+  linkedin                         String?                            @db.VarChar(300)
+  instagram                        String?                            @db.VarChar(300)
+  facebook                         String?                            @db.VarChar(300)
+  company_profile_complete         Boolean?                           @default(false)
+  company_created_at               DateTime?                          @db.DateTime(0)
+  company_updated_at               DateTime?                          @db.DateTime(0)
+  google_id                        String?                            @db.VarChar(255)
+  login_type                       recruiters_login_type?             @default(EMAIL)
+  approval_status                  recruiters_approval_status         @default(PENDING)
+  approval_rejection_reason        String?                            @db.Text
+  approval_reviewed_at             DateTime?                          @db.DateTime(0)
+  approval_reviewed_by             BigInt?
+  onboarding_step                  Int?                               @default(0)
+  onboarding_completed_at          DateTime?                          @db.DateTime(0)
+  phone_verified                   Boolean?                           @default(false)
+  phone_verified_at                DateTime?                          @db.DateTime(0)
+  is_premium                       Boolean?                           @default(false)
+  premium_expiry                   DateTime?                          @db.Date
+  premium_expiry_at                DateTime?                          @db.DateTime(0)
+  created_at                       DateTime?                          @default(now()) @db.Timestamp(0)
+  updated_at                       DateTime?                          @default(now()) @db.Timestamp(0)
+  application_conversations        application_conversations[]
+  companies                        companies[]
+  company_ratings                  company_ratings[]
+  introduction_videos              introduction_videos[]
+  jobs                             jobs[]
+  payments                         payments[]
+  recruiter_activity_logs          recruiter_activity_logs[]
+  recruiter_notifications          recruiter_notifications[]
+  recruiter_subscriptions          recruiter_subscriptions[]
+  recruiter_verification_documents recruiter_verification_documents[]
+  sub_recruiter_records            sub_recruiters[]
+}
+
+model reset_tokens {
+  id         BigInt                 @id @default(autoincrement())
+  token      String                 @unique(map: "token") @db.VarChar(255)
+  user_id    BigInt
+  user_type  reset_tokens_user_type
+  email      String                 @db.VarChar(150)
+  expires_at DateTime               @db.DateTime(0)
+  created_at DateTime?              @default(now()) @db.Timestamp(0)
+
+  @@index([email], map: "idx_reset_email")
+  @@index([expires_at], map: "idx_reset_expires")
+  @@index([user_id], map: "idx_reset_user")
+}
+
+model resumes {
+  id             BigInt              @id @default(autoincrement())
+  user_id        BigInt
+  file_name      String              @db.VarChar(255)
+  file_path      String              @db.VarChar(500)
+  file_size      BigInt?
+  file_type      String?             @db.VarChar(50)
+  visibility     resumes_visibility? @default(PRIVATE)
+  download_count Int?                @default(0)
+  is_featured    Boolean?            @default(false)
+  flagged        Boolean?            @default(false)
+  flag_reason    String?             @db.Text
+  uploaded_at    DateTime?           @default(now()) @db.DateTime(0)
+  created_at     DateTime?           @default(now()) @db.Timestamp(0)
+  updated_at     DateTime?           @default(now()) @db.Timestamp(0)
+  users          users               @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "fk_resumes_user")
+
+  @@index([flagged], map: "idx_resumes_flagged")
+  @@index([user_id], map: "idx_resumes_user")
+  @@index([visibility], map: "idx_resumes_visibility")
+}
+
+model saved_jobs {
+  id         BigInt    @id @default(autoincrement())
+  user_id    BigInt
+  job_id     BigInt
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  jobs       jobs      @relation(fields: [job_id], references: [id], onDelete: Cascade, map: "fk_saved_jobs_job")
+  users      users     @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "fk_saved_jobs_user")
+
+  @@unique([user_id, job_id], map: "unique_user_job")
+  @@index([job_id], map: "idx_saved_jobs_job")
+  @@index([user_id], map: "idx_saved_jobs_user")
+}
+
+model sub_recruiters {
+  id           BigInt     @id @default(autoincrement())
+  recruiter_id BigInt
+  name         String     @db.VarChar(150)
+  email        String     @unique(map: "email") @db.VarChar(150)
+  password     String     @db.VarChar(255)
+  created_at   DateTime?  @default(now()) @db.Timestamp(0)
+  recruiters   recruiters @relation(fields: [recruiter_id], references: [id], onDelete: Cascade, map: "fk_sub_recruiter_parent")
+
+  @@index([recruiter_id], map: "idx_sub_recruiter_parent")
+}
+
+model subscription_plans {
+  id                      BigInt                    @id @default(autoincrement())
+  name                    String                    @db.VarChar(150)
+  description             String?                   @db.Text
+  price                   Decimal                   @db.Decimal(12, 2)
+  duration_months         Int
+  job_post_limit          Int?                      @default(0)
+  features                Json?
+  is_active               Boolean?                  @default(true)
+  created_at              DateTime?                 @default(now()) @db.Timestamp(0)
+  payments                payments[]
+  recruiter_subscriptions recruiter_subscriptions[]
+
+  @@index([is_active], map: "idx_subscription_active")
+  @@index([price], map: "idx_subscription_price")
+}
+
+model super_admins {
+  id            BigInt               @id @default(autoincrement())
+  name          String               @db.VarChar(150)
+  email         String               @unique(map: "email") @db.VarChar(150)
+  password      String               @db.VarChar(255)
+  role          String               @default("SUPER_ADMIN") @db.VarChar(50)
+  status        super_admins_status? @default(ACTIVE)
+  last_login    DateTime?            @db.DateTime(0)
+  created_at    DateTime?            @default(now()) @db.Timestamp(0)
+  updated_at    DateTime?            @default(now()) @db.Timestamp(0)
+  banner_images banner_images[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model user_connections {
+  id                                        BigInt                  @id @default(autoincrement())
+  sender_id                                 BigInt
+  receiver_id                               BigInt
+  status                                    user_connections_status @default(pending)
+  pair_key                                  String                  @unique(map: "uniq_user_connections_pair") @db.VarChar(64)
+  created_at                                DateTime?               @default(now()) @db.Timestamp(0)
+  updated_at                                DateTime?               @default(now()) @db.Timestamp(0)
+  users_user_connections_sender_idTousers   users                   @relation("user_connections_sender_idTousers", fields: [sender_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "user_connections_ibfk_1")
+  users_user_connections_receiver_idTousers users                   @relation("user_connections_receiver_idTousers", fields: [receiver_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "user_connections_ibfk_2")
+
+  @@index([receiver_id, status], map: "idx_user_connections_receiver_status")
+  @@index([sender_id, status], map: "idx_user_connections_sender_status")
+}
+
+model user_follows {
+  id                                          BigInt    @id @default(autoincrement())
+  follower_id                                 BigInt
+  following_id                                BigInt
+  created_at                                  DateTime? @default(now()) @db.Timestamp(0)
+  users_user_follows_follower_idTousers       users     @relation("user_follows_follower_idTousers", fields: [follower_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_user_follows_following_idTousers      users     @relation("user_follows_following_idTousers", fields: [following_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([follower_id, following_id], map: "uniq_user_follows_pair")
+  @@index([follower_id], map: "idx_user_follows_follower")
+  @@index([following_id], map: "idx_user_follows_following")
+}
+
+model user_notifications {
+  id             BigInt                     @id @default(autoincrement())
+  user_id        BigInt
+  application_id BigInt?
+  message        String                     @db.Text
+  metadata       Json?
+  status         user_notifications_status? @default(UNREAD)
+  created_at     DateTime?                  @default(now()) @db.Timestamp(0)
+  updated_at     DateTime?                  @default(now()) @db.Timestamp(0)
+  applications   applications?              @relation(fields: [application_id], references: [id], onDelete: Cascade, map: "fk_user_notifications_application")
+  users          users                      @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "fk_user_notifications_user")
+
+  @@index([application_id], map: "idx_user_notifications_application")
+  @@index([status], map: "idx_user_notifications_status")
+  @@index([user_id], map: "idx_user_notifications_user")
+}
+
+model user_reviews {
+  id             Int       @id @default(autoincrement())
+  user_id        Int?
+  rating         Int       @db.TinyInt
+  review_message String    @db.Text
+  user_name      String    @db.VarChar(255)
+  job_title      String?   @db.VarChar(255)
+  company_name   String?   @db.VarChar(255)
+  profile_image  String?   @db.MediumText
+  created_at     DateTime? @default(now()) @db.Timestamp(0)
+  updated_at     DateTime? @default(now()) @db.Timestamp(0)
+
+  @@index([created_at], map: "idx_created_at")
+  @@index([user_id], map: "idx_user_id")
+}
+
+model users {
+  id                                                   BigInt                      @id @default(autoincrement())
+  name                                                 String                      @db.VarChar(150)
+  email                                                String                      @unique(map: "email") @db.VarChar(150)
+  password                                             String?                     @db.VarChar(255)
+  role                                                 users_role?                 @default(USER)
+  status                                               users_status?               @default(ACTIVE)
+  profile_complete                                     Boolean?                    @default(false)
+  profile_photo                                        String?                     @db.VarChar(500)
+  gender                                               users_gender?
+  date_of_birth                                        DateTime?                   @db.Date
+  contact_number                                       String?                     @db.VarChar(20)
+  email_verified                                       Boolean?                    @default(false)
+  phone_verified                                       Boolean?                    @default(false)
+  current_location                                     String?                     @db.VarChar(150)
+  permanent_address                                    String?                     @db.Text
+  nationality                                          String?                     @db.VarChar(100)
+  linkedin_url                                         String?                     @db.VarChar(300)
+  github_url                                           String?                     @db.VarChar(300)
+  portfolio_url                                        String?                     @db.VarChar(300)
+  profile_visibility                                   users_profile_visibility?   @default(PUBLIC)
+  resume_headline                                      String?                     @db.VarChar(255)
+  professional_summary                                 String?                     @db.Text
+  key_highlights                                       String?                     @db.Text
+  resume_file                                          String?                     @db.VarChar(500)
+  employment_status                                    users_employment_status?
+  total_experience_years                               Int?                        @default(0)
+  total_experience_months                              Int?                        @default(0)
+  notice_period                                        Int?
+  current_salary                                       Decimal?                    @db.Decimal(12, 2)
+  expected_salary                                      Decimal?                    @db.Decimal(12, 2)
+  salary_confidential                                  Boolean?                    @default(false)
+  highest_qualification                                String?                     @db.VarChar(150)
+  degree                                               String?                     @db.VarChar(150)
+  field_of_study                                       String?                     @db.VarChar(150)
+  college_name                                         String?                     @db.VarChar(200)
+  year_of_passing                                      Int?                        @db.Year
+  percentage                                           Decimal?                    @db.Decimal(5, 2)
+  cgpa                                                 Decimal?                    @db.Decimal(4, 2)
+  core_skills                                          String?                     @db.Text
+  secondary_skills                                     String?                     @db.Text
+  tools_technologies                                   String?                     @db.Text
+  skill_proficiency                                    String?                     @db.Text
+  skill_experience                                     String?                     @db.Text
+  skill_keywords                                       String?                     @db.Text
+  projects                                             String?                     @db.Text
+  certifications                                       String?                     @db.Text
+  desired_job_role                                     String?                     @db.VarChar(150)
+  preferred_locations                                  String?                     @db.Text
+  preferred_employment_type                            String?                     @db.VarChar(100)
+  expected_salary_range                                String?                     @db.VarChar(100)
+  industry_preference                                  String?                     @db.VarChar(150)
+  functional_area                                      String?                     @db.VarChar(150)
+  preferred_shift                                      String?                     @db.VarChar(100)
+  open_to_relocation                                   Boolean?                    @default(false)
+  personal_website                                     String?                     @db.VarChar(300)
+  social_media_links                                   String?                     @db.Text
+  recommendations                                      String?                     @db.Text
+  languages_known                                      String?                     @db.Text
+  hobbies_interests                                    String?                     @db.Text
+  soft_skills                                          String?                     @db.Text
+  personality_traits                                   String?                     @db.Text
+  career_objective                                     String?                     @db.Text
+  profile_completeness_percentage                      Int?                        @default(0)
+  last_updated                                         DateTime?                   @db.DateTime(0)
+  profile_health                                       String?                     @db.VarChar(100)
+  ai_resume_score                                      Int?
+  skill_gap_analysis                                   String?                     @db.Text
+  verified_badges                                      String?                     @db.Text
+  profile_share_link                                   String?                     @db.VarChar(300)
+  one_click_apply_enabled                              Boolean?                    @default(true)
+  created_at                                           DateTime?                   @default(now()) @db.Timestamp(0)
+  updated_at                                           DateTime?                   @default(now()) @db.Timestamp(0)
+  last_login_at                                        DateTime?                   @db.DateTime(0)
+  last_login_device                                    String?                     @db.VarChar(150)
+  email_notifications                                  Boolean?                    @default(true)
+  job_alerts                                           Boolean?                    @default(true)
+  google_id                                            String?                     @db.VarChar(255)
+  login_type                                           users_login_type?           @default(EMAIL)
+  relocated                                            Boolean?                    @default(false)
+  application_conversations                            application_conversations[]
+  applications                                         applications[]
+  certification_records                                certifications[]
+  company_ratings                                      company_ratings[]
+  introduction_videos                                  introduction_videos[]
+  job_applications                                     job_applications[]
+  project_records                                      projects[]
+  resumes                                              resumes[]
+  saved_jobs                                           saved_jobs[]
+  user_connections_user_connections_sender_idTousers   user_connections[]          @relation("user_connections_sender_idTousers")
+  user_connections_user_connections_receiver_idTousers user_connections[]          @relation("user_connections_receiver_idTousers")
+  user_follows_user_follows_follower_idTousers         user_follows[]              @relation("user_follows_follower_idTousers")
+  user_follows_user_follows_following_idTousers        user_follows[]              @relation("user_follows_following_idTousers")
+  user_notifications                                   user_notifications[]
+}
+
+model saved_companies {
+  id         BigInt    @id @default(autoincrement())
+  user_id    BigInt
+  company_id BigInt
+  created_at DateTime? @default(now()) @db.DateTime(0)
+
+  @@unique([user_id, company_id], map: "uniq_user_company")
+  @@index([company_id], map: "idx_company")
+  @@index([user_id], map: "idx_user")
+}
+
+model user_direct_messages {
+  id          BigInt    @id @default(autoincrement())
+  sender_id   BigInt
+  receiver_id BigInt
+  message     String    @db.Text
+  is_read     Boolean?  @default(false)
+  created_at  DateTime? @default(now()) @db.Timestamp(0)
+
+  @@index([created_at], map: "idx_udm_created_at")
+  @@index([sender_id, receiver_id], map: "idx_udm_pair")
+  @@index([receiver_id], map: "idx_udm_receiver")
+  @@index([sender_id], map: "idx_udm_sender")
+}
+
+enum favourite_notifications_type {
+  FAV_COMPANY_NEW_JOB
+}
+
+enum job_applications_status {
+  APPLIED
+  SHORTLISTED
+  INTERVIEW
+  REJECTED
+  HIRED
+  WITHDRAWN
+}
+
+enum reset_tokens_user_type {
+  USER
+  RECRUITER
+  SUPER_ADMIN
+}
+
+enum user_connections_status {
+  pending
+  accepted
+  rejected
+}
+
+enum notifications_recipient_type {
+  ALL
+  USER
+  RECRUITER
+  SUPER_ADMIN
+}
+
+enum recruiter_verification_documents_status {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum super_admins_status {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+enum users_role {
+  USER
+  RECRUITER
+  ADMIN
+}
+
+enum application_messages_sender_role {
+  USER
+  RECRUITER
+  SUPER_ADMIN
+}
+
+enum favourite_notifications_entity_type {
+  JOB
+  COMPANY
+}
+
+enum recruiter_subscriptions_status {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  PENDING
+}
+
+enum user_notifications_status {
+  UNREAD
+  READ
+}
+
+enum users_status {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+enum notifications_status {
+  DRAFT
+  SENT
+  SCHEDULED
+  FAILED
+}
+
+enum recruiter_subscriptions_payment_status {
+  PAID
+  UNPAID
+  FAILED
+  REFUNDED
+}
+
+enum recruiters_role {
+  RECRUITER
+  SUB_RECRUITER
+  ADMIN
+}
+
+enum resumes_visibility {
+  PUBLIC
+  PRIVATE
+  RECRUITERS_ONLY
+}
+
+enum application_messages_receiver_role {
+  USER
+  RECRUITER
+  SUPER_ADMIN
+}
+
+enum payments_status {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum recruiters_status {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+enum users_gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum application_messages_pinned_by_role {
+  USER
+  RECRUITER
+  SUPER_ADMIN
+}
+
+enum jobs_status {
+  DRAFT
+  OPEN
+  CLOSED
+  PAUSED
+}
+
+enum users_profile_visibility {
+  PUBLIC
+  PRIVATE
+  RECRUITERS_ONLY
+}
+
+enum users_employment_status {
+  FRESHER
+  EMPLOYED
+  UNEMPLOYED
+  STUDENT
+}
+
+enum recruiters_login_type {
+  EMAIL
+  GOOGLE
+}
+
+enum recruiters_approval_status {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum users_login_type {
+  EMAIL
+  GOOGLE
+}
+
+enum jobs_experience_level {
+  ENTRY_LEVEL
+  INTERNSHIP_LEVEL
+  MID_LEVEL
+  SENIOR_LEVEL
+  EXECUTIVE_LEVEL
+}
+
+enum recruiters_subscription_status {
+  FREE
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  TRIAL
+  PAUSED
+}

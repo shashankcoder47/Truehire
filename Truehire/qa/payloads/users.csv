@@ -1,0 +1,4 @@
+email,password,role
+admin@truehire.com,admin123,ADMIN
+qa.recruiter@truehire.com,ChangeMe123!,RECRUITER
+qa.candidate@truehire.com,ChangeMe123!,USER

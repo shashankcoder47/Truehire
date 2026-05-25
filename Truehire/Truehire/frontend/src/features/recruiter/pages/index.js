@@ -1,0 +1,12 @@
+export { default as RecruiterChatsPage } from './recruiter-chats'
+export { default as RecruiterDashboardPage } from './recruiter-dashboard'
+export { default as RecruiterForgotPasswordPage } from './recruiter-forgot-password'
+export { default as RecruiterLoginPage } from './login'
+export { default as RecruiterOtpPage } from './recruiter-otp'
+export { default as RecruiterPrivacyPolicyPage } from './recruiter-privacy-policy'
+export { default as RecruiterProfilePage } from './recruiter-profile'
+export { default as RecruiterRegisterPage } from './recruiter-register'
+export { default as RecruiterResetPasswordPage } from './recruiter-reset-password'
+export { default as RecruiterSettingsPage } from './recruiter-settings'
+export { default as RecruiterTermsOfServicePage } from './recruiter-terms-of-service'
+

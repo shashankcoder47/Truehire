@@ -1,0 +1,6 @@
+-- TrueHire database setup is managed with Prisma.
+-- Source of truth: prisma/schema.prisma
+-- Recommended workflow:
+--   npx prisma generate
+--   npx prisma migrate dev
+--   npx prisma db seed

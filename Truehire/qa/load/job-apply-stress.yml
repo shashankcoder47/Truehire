@@ -1,0 +1,35 @@
+config:
+  target: "{{ $processEnvironment.API_BASE_URL || 'http://127.0.0.1:5000/api' }}"
+  processor: "./processors/token-processor.js"
+  phases:
+    - duration: 60
+      arrivalRate: 5
+      rampTo: 20
+    - duration: 120
+      arrivalRate: 30
+  payload:
+    path: "../payloads/candidates.csv"
+    fields: [email, password, role, jobId]
+  ensure:
+    thresholds:
+      - http.response_time.p95: 1500
+      - http.codes.5xx: 0
+scenarios:
+  - name: candidate applies to job
+    flow:
+      - post:
+          url: "/auth/login"
+          json:
+            email: "{{ email }}"
+            password: "{{ password }}"
+            role: "{{ role }}"
+          capture:
+            - json: "$.token"
+              as: token
+      - post:
+          url: "/jobs/{{ jobId }}/apply"
+          beforeRequest: "setBearerToken"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          json:
+            coverLetter: "Performance test application"

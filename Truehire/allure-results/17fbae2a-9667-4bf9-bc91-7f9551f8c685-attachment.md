@@ -1,0 +1,128 @@
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: ui\candidate.spec.js >> Candidate Module UI >> track application
+- Location: qa\tests\ui\candidate.spec.js:16:3
+
+# Error details
+
+```
+Error: expect(locator).toBeVisible() failed
+
+Locator: getByText(/application|status|track|submitted/i).first()
+Expected: visible
+Timeout: 10000ms
+Error: element(s) not found
+
+Call log:
+  - Expect "toBeVisible" with timeout 10000ms
+  - waiting for getByText(/application|status|track|submitted/i).first()
+
+```
+
+# Page snapshot
+
+```yaml
+- generic:
+  - generic [active]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - navigation [ref=e6]:
+            - button "previous" [disabled] [ref=e7]:
+              - img "previous" [ref=e8]
+            - generic [ref=e10]:
+              - generic [ref=e11]: 1/
+              - text: "1"
+            - button "next" [disabled] [ref=e12]:
+              - img "next" [ref=e13]
+          - img
+        - generic [ref=e15]:
+          - link "Next.js 16.1.6 (stale) Webpack" [ref=e16] [cursor=pointer]:
+            - /url: https://nextjs.org/docs/messages/version-staleness
+            - img [ref=e17]
+            - generic "There is a newer version (16.2.4) available, upgrade recommended!" [ref=e19]: Next.js 16.1.6 (stale)
+            - generic [ref=e20]: Webpack
+          - img
+      - dialog "Runtime TypeError" [ref=e22]:
+        - generic [ref=e25]:
+          - generic [ref=e26]:
+            - generic [ref=e27]:
+              - generic [ref=e29]: Runtime TypeError
+              - generic [ref=e30]:
+                - button "Copy Error Info" [ref=e31] [cursor=pointer]:
+                  - img [ref=e32]
+                - button "No related documentation found" [disabled] [ref=e34]:
+                  - img [ref=e35]
+                - button "Attach Node.js inspector" [ref=e37] [cursor=pointer]:
+                  - img [ref=e38]
+            - generic [ref=e47]: Cannot read properties of null (reading 'parentNode')
+          - generic [ref=e49]:
+            - generic [ref=e50]:
+              - paragraph [ref=e51]:
+                - text: Call Stack
+                - generic [ref=e52]: "17"
+              - button "Show 14 ignore-listed frame(s)" [ref=e53] [cursor=pointer]:
+                - text: Show 14 ignore-listed frame(s)
+                - img [ref=e54]
+            - generic [ref=e56]:
+              - generic [ref=e57]: (pages-dir-browser)/./src/styles/globals.css
+              - text: .next\dev\static\chunks\pages\_app.js (158:1)
+            - generic [ref=e58]:
+              - generic [ref=e59]: eval
+              - text: ./src/pages/_app.js
+            - generic [ref=e60]:
+              - generic [ref=e61]: (pages-dir-browser)/./src/pages/_app.js
+              - text: .next\dev\static\chunks\pages\_app.js (137:1)
+        - generic [ref=e62]: "1"
+        - generic [ref=e63]: "2"
+    - generic [ref=e68] [cursor=pointer]:
+      - button "Open Next.js Dev Tools" [ref=e69]:
+        - img [ref=e70]
+      - generic [ref=e73]:
+        - button "Open issues overlay" [ref=e74]:
+          - generic [ref=e75]:
+            - generic [ref=e76]: "0"
+            - generic [ref=e77]: "1"
+          - generic [ref=e78]: Issue
+        - button "Collapse issues badge" [ref=e79]:
+          - img [ref=e80]
+  - alert [ref=e82]
+```
+
+# Test source
+
+```ts
+  1  | import { test, expect } from '../../fixtures/test-fixtures.js';
+  2  | import { CandidatePage } from '../../pages/candidate.page.js';
+  3  | import { buildCandidateProfile } from '../../utils/test-data.js';
+  4  | 
+  5  | test.describe('Candidate Module UI', () => {
+  6  |   test.use({ storageState: 'qa/.auth/candidate.json' });
+  7  | 
+  8  |   test('search job', async ({ page }) => {
+  9  |     await new CandidatePage(page).searchJobs('Engineer');
+  10 |   });
+  11 | 
+  12 |   test('apply job with resume upload', async ({ page }) => {
+  13 |     await new CandidatePage(page).applyToFirstJob();
+  14 |   });
+  15 | 
+  16 |   test('track application', async ({ page }) => {
+  17 |     const candidate = new CandidatePage(page);
+  18 |     await candidate.openApplications();
+> 19 |     await expect(page.getByText(/application|status|track|submitted/i).first()).toBeVisible();
+     |                                                                                 ^ Error: expect(locator).toBeVisible() failed
+  20 |   });
+  21 | 
+  22 |   test('profile update', async ({ page }) => {
+  23 |     await new CandidatePage(page).updateProfile(buildCandidateProfile());
+  24 |   });
+  25 | });
+  26 | 
+```

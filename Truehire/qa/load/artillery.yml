@@ -1,0 +1,44 @@
+config:
+  target: "{{ $processEnvironment.API_BASE_URL || 'http://127.0.0.1:5000/api' }}"
+  processor: "./processors/token-processor.js"
+  phases:
+    - name: warmup
+      duration: 30
+      arrivalRate: 2
+    - name: steady-load
+      duration: 120
+      arrivalRate: 10
+      rampTo: 30
+    - name: spike
+      duration: 60
+      arrivalRate: 50
+  payload:
+    path: "../payloads/users.csv"
+    fields:
+      - email
+      - password
+      - role
+  ensure:
+    thresholds:
+      - http.response_time.p95: 1200
+      - http.response_time.p99: 2500
+      - http.codes.5xx: 0
+scenarios:
+  - name: authenticated journey
+    flow:
+      - post:
+          url: "/auth/login"
+          json:
+            email: "{{ email }}"
+            password: "{{ password }}"
+            role: "{{ role }}"
+          capture:
+            - json: "$.token"
+              as: token
+            - json: "$.accessToken"
+              as: accessToken
+      - get:
+          url: "/jobs?limit=20"
+      - get:
+          url: "/payments/status"
+          beforeRequest: "setBearerToken"

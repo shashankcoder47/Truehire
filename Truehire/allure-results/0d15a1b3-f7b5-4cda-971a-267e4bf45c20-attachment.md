@@ -1,0 +1,196 @@
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: auth.setup.js >> authenticate candidate
+- Location: qa\tests\auth.setup.js:12:3
+
+# Error details
+
+```
+TimeoutError: locator.click: Timeout 15000ms exceeded.
+Call log:
+  - waiting for getByRole('button', { name: /login|sign in/i })
+    - locator resolved to <button type="submit" class="flex w-full items-center justify-center rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70">Login</button>
+  - attempting click action
+    2 × waiting for element to be visible, enabled and stable
+      - element is visible, enabled and stable
+      - scrolling into view if needed
+      - done scrolling
+      - <nextjs-portal></nextjs-portal> intercepts pointer events
+    - retrying click action
+    - waiting 20ms
+    2 × waiting for element to be visible, enabled and stable
+      - element is visible, enabled and stable
+      - scrolling into view if needed
+      - done scrolling
+      - <nextjs-portal></nextjs-portal> intercepts pointer events
+    - retrying click action
+      - waiting 100ms
+    28 × waiting for element to be visible, enabled and stable
+       - element is visible, enabled and stable
+       - scrolling into view if needed
+       - done scrolling
+       - <nextjs-portal></nextjs-portal> intercepts pointer events
+     - retrying click action
+       - waiting 500ms
+
+```
+
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e5]:
+    - generic [ref=e6]:
+      - link "TrueHire logoTrueHire" [ref=e7] [cursor=pointer]:
+        - /url: /
+        - img "TrueHire logo" [ref=e9]
+        - text: TrueHire
+      - paragraph [ref=e10]: User Login
+      - heading "User Login" [level=1] [ref=e11]
+      - paragraph [ref=e12]: Sign in to continue your job search and track applications.
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - paragraph [ref=e15]: User login
+        - heading "User Login" [level=2] [ref=e16]
+        - paragraph [ref=e17]: Sign in to continue your job search and track applications.
+      - generic [ref=e18]:
+        - generic [ref=e19]:
+          - text: Email address
+          - textbox "Email address" [ref=e20]:
+            - /placeholder: Enter your email
+            - text: qa.candidate@truehire.com
+        - generic [ref=e21]:
+          - generic [ref=e22]:
+            - text: Password
+            - link "Forgot password?" [ref=e23] [cursor=pointer]:
+              - /url: /forgot-password
+          - textbox "Password" [active] [ref=e24]:
+            - /placeholder: Enter your password
+            - text: ChangeMe123!
+          - generic [ref=e25]:
+            - checkbox "Show password" [ref=e26]
+            - text: Show password
+        - button "Login" [ref=e27]
+        - generic [ref=e29]: Or continue with
+        - button "Continue with Google" [ref=e31]:
+          - img [ref=e32]
+          - text: Continue with Google
+        - generic [ref=e39]:
+          - link "Create a new account" [ref=e40] [cursor=pointer]:
+            - /url: /register
+          - link "Back to Home" [ref=e41] [cursor=pointer]:
+            - /url: /
+  - generic:
+    - generic [ref=e44]:
+      - generic [ref=e45]:
+        - generic [ref=e46]:
+          - navigation [ref=e47]:
+            - button "previous" [disabled] [ref=e48]:
+              - img "previous" [ref=e49]
+            - generic [ref=e51]:
+              - generic [ref=e52]: 1/
+              - text: "1"
+            - button "next" [disabled] [ref=e53]:
+              - img "next" [ref=e54]
+          - img
+        - generic [ref=e56]:
+          - link "Next.js 16.1.6 (stale) Webpack" [ref=e57] [cursor=pointer]:
+            - /url: https://nextjs.org/docs/messages/version-staleness
+            - img [ref=e58]
+            - generic "There is a newer version (16.2.4) available, upgrade recommended!" [ref=e60]: Next.js 16.1.6 (stale)
+            - generic [ref=e61]: Webpack
+          - img
+      - dialog "Runtime TypeError" [ref=e63]:
+        - generic [ref=e66]:
+          - generic [ref=e67]:
+            - generic [ref=e68]:
+              - generic [ref=e70]: Runtime TypeError
+              - generic [ref=e71]:
+                - button "Copy Error Info" [ref=e72] [cursor=pointer]:
+                  - img [ref=e73]
+                - button "No related documentation found" [disabled] [ref=e75]:
+                  - img [ref=e76]
+                - button "Attach Node.js inspector" [ref=e78] [cursor=pointer]:
+                  - img [ref=e79]
+            - generic [ref=e88]: Cannot read properties of null (reading 'parentNode')
+          - generic [ref=e90]:
+            - generic [ref=e91]:
+              - paragraph [ref=e92]:
+                - text: Call Stack
+                - generic [ref=e93]: "17"
+              - button "Show 14 ignore-listed frame(s)" [ref=e94] [cursor=pointer]:
+                - text: Show 14 ignore-listed frame(s)
+                - img [ref=e95]
+            - generic [ref=e97]:
+              - generic [ref=e98]: (pages-dir-browser)/./src/styles/globals.css
+              - text: .next\dev\static\chunks\pages\_app.js (158:1)
+            - generic [ref=e99]:
+              - generic [ref=e100]: eval
+              - text: ./src/pages/_app.js
+            - generic [ref=e101]:
+              - generic [ref=e102]: (pages-dir-browser)/./src/pages/_app.js
+              - text: .next\dev\static\chunks\pages\_app.js (137:1)
+        - generic [ref=e103]: "1"
+        - generic [ref=e104]: "2"
+    - generic [ref=e109] [cursor=pointer]:
+      - button "Open Next.js Dev Tools" [ref=e110]:
+        - img [ref=e111]
+      - generic [ref=e114]:
+        - button "Open issues overlay" [ref=e115]:
+          - generic [ref=e116]:
+            - generic [ref=e117]: "0"
+            - generic [ref=e118]: "1"
+          - generic [ref=e119]: Issue
+        - button "Collapse issues badge" [ref=e120]:
+          - img [ref=e121]
+  - alert [ref=e123]
+```
+
+# Test source
+
+```ts
+  1  | import { expect } from '@playwright/test';
+  2  | import { BasePage } from './base.page.js';
+  3  | 
+  4  | const rolePaths = {
+  5  |   admin: '/login?role=admin',
+  6  |   recruiter: '/login?role=recruiter',
+  7  |   candidate: '/login?role=user'
+  8  | };
+  9  | 
+  10 | const landingSignals = {
+  11 |   admin: /dashboard|analytics|admin/i,
+  12 |   recruiter: /dashboard|jobs|applications|recruiter/i,
+  13 |   candidate: /welcome|overview|jobs|candidate/i
+  14 | };
+  15 | 
+  16 | export class LoginPage extends BasePage {
+  17 |   async open(role = 'candidate') {
+  18 |     await this.goto(rolePaths[role] || rolePaths.candidate);
+  19 |   }
+  20 | 
+  21 |   async loginAs(role, credentials) {
+  22 |     await this.open(role);
+  23 |     await this.fillByLabelOrPlaceholder(/email/i, credentials.email);
+  24 |     await this.fillByLabelOrPlaceholder(/password/i, credentials.password);
+> 25 |     await this.page.getByRole('button', { name: /login|sign in/i }).click();
+     |                                                                     ^ TimeoutError: locator.click: Timeout 15000ms exceeded.
+  26 |     await this.page.waitForLoadState('networkidle').catch(() => {});
+  27 |     await expect(this.page.getByText(landingSignals[role]).first()).toBeVisible({ timeout: 20_000 });
+  28 |   }
+  29 | 
+  30 |   async submitInvalidLogin(role, credentials) {
+  31 |     await this.open(role);
+  32 |     await this.fillByLabelOrPlaceholder(/email/i, credentials.email);
+  33 |     await this.fillByLabelOrPlaceholder(/password/i, credentials.password);
+  34 |     await this.page.getByRole('button', { name: /login|sign in/i }).click();
+  35 |   }
+  36 | }
+  37 | 
+```

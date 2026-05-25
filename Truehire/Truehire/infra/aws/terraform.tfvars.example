@@ -1,0 +1,13 @@
+aws_region         = "ap-south-1"
+project_name       = "truehire"
+environment        = "production"
+vpc_id             = "vpc-xxxxxxxx"
+public_subnet_id   = "subnet-xxxxxxxx"
+private_subnet_ids = ["subnet-aaaaaaaa", "subnet-bbbbbbbb"]
+allowed_ssh_cidr   = "YOUR_PUBLIC_IP/32"
+key_name           = "your-existing-keypair"
+ami_id             = "ami-xxxxxxxx"
+db_username        = "truehire_admin"
+db_password        = "replace-with-a-strong-password"
+db_name            = "truehire"
+

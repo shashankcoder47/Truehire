@@ -1,0 +1,21 @@
+config:
+  target: "{{ $processEnvironment.API_BASE_URL || 'http://127.0.0.1:5000/api' }}"
+  phases:
+    - duration: 90
+      arrivalRate: 10
+      rampTo: 60
+  payload:
+    path: "../payloads/search-terms.csv"
+    fields: [keyword, location]
+  ensure:
+    thresholds:
+      - http.response_time.p95: 1000
+      - http.response_time.p99: 2000
+      - http.codes.5xx: 0
+scenarios:
+  - name: search jobs
+    flow:
+      - get:
+          url: "/jobs?search={{ keyword }}&location={{ location }}&limit=20"
+          expect:
+            - statusCode: 200
