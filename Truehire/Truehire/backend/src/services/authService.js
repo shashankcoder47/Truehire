@@ -235,7 +235,8 @@ const registerAppUserWithMysql = async ({ name, email, password }) => {
   const hashedPassword = await hashPassword(password);
   const [result] = await pool.execute(
     `INSERT INTO users (name, email, password, role, created_at, updated_at)
-     VALUES (?, ?, ?, ?, NOW(), NOW())`,
+     VALUES (?, ?, ?, ?, NOW(), NOW())
+     RETURNING id`,
     [name, email, hashedPassword, ROLES.USER],
   );
 
@@ -262,7 +263,8 @@ const registerRecruiterWithMysql = async ({ name, email, password, company }) =>
        name, email, password, company, company_name, role, approval_status,
        approval_rejection_reason, created_at, updated_at
      )
-     VALUES (?, ?, ?, ?, ?, ?, 'PENDING', NULL, NOW(), NOW())`,
+     VALUES (?, ?, ?, ?, ?, ?, 'PENDING', NULL, NOW(), NOW())
+     RETURNING id`,
     [name, email, hashedPassword, company || null, company || null, ROLES.RECRUITER],
   );
 

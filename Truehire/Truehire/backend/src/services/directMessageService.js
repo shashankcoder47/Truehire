@@ -231,7 +231,7 @@ export const listDirectConversations = async (userId, actorType = 'USER') => {
        (
          SELECT COUNT(*)
          FROM user_direct_conversation_messages m
-         WHERE m.conversation_id = c.id AND m.receiver_id = ? AND m.receiver_type = ? AND m.is_read = FALSE
+         WHERE m.conversation_id = c.id AND m.receiver_id = ? AND m.receiver_type = ? AND m.is_read = 0
        ) AS unread_count
      FROM user_direct_conversations c
      LEFT JOIN users user_other
@@ -347,7 +347,8 @@ export const sendDirectMessage = async ({ conversationId, senderId, senderType =
 
   const [result] = await pool.execute(
     `INSERT INTO user_direct_conversation_messages (conversation_id, sender_id, sender_type, receiver_id, receiver_type, message, reply_to_message_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     RETURNING id`,
     [
       toId(conversationId, 'conversation id'),
       participant.senderId,
@@ -377,8 +378,8 @@ export const markDirectMessagesRead = async (conversationId, userId, actorType =
   await assertConversationAccess(conversationId, userId, type);
   const [result] = await pool.execute(
     `UPDATE user_direct_conversation_messages
-     SET is_read = TRUE
-     WHERE conversation_id = ? AND receiver_id = ? AND receiver_type = ? AND is_read = FALSE`,
+     SET is_read = 1
+     WHERE conversation_id = ? AND receiver_id = ? AND receiver_type = ? AND is_read = 0`,
     [toId(conversationId, 'conversation id'), toId(userId, 'user id'), type],
   );
   return Number(result.affectedRows || 0);

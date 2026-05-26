@@ -74,7 +74,7 @@ export const ensureWeeklyJobAlertLogTable = async () => {
 export const getJobAlertPreference = async (userId) => {
   const [rows] = await pool.query(
     'SELECT job_alerts FROM users WHERE id = ? LIMIT 1',
-    [userId],
+    [Number(userId)],
   );
 
   return {
@@ -91,7 +91,7 @@ export const getUserNotificationSettings = async (userId) => {
       WHERE id = ?
       LIMIT 1
     `,
-    [userId],
+    [Number(userId)],
   );
 
   const settings = rows[0] || {};
@@ -120,12 +120,12 @@ export const updateUserNotificationSettings = async (userId, payload) => {
   const updates = {};
 
   if (payload.email_notifications !== undefined) {
-    updates.email_notifications = payload.email_notifications ? 1 : 0;
+    updates.email_notifications = Boolean(payload.email_notifications);
   }
 
   const nextJobAlerts = payload.job_alert_enabled ?? payload.job_alerts;
   if (nextJobAlerts !== undefined) {
-    updates.job_alerts = nextJobAlerts ? 1 : 0;
+    updates.job_alerts = Boolean(nextJobAlerts);
   }
 
   const entries = Object.entries(updates);
@@ -137,7 +137,7 @@ export const updateUserNotificationSettings = async (userId, payload) => {
       SET ${entries.map(([key]) => `${key} = ?`).join(', ')}, updated_at = NOW()
       WHERE id = ?
     `,
-    [...entries.map(([, value]) => value), userId],
+    [...entries.map(([, value]) => value), Number(userId)],
   );
 
   return getUserNotificationSettings(userId);
@@ -146,7 +146,7 @@ export const updateUserNotificationSettings = async (userId, payload) => {
 export const updateJobAlertPreference = async (userId, enabled) => {
   await pool.query(
     'UPDATE users SET job_alerts = ?, updated_at = NOW() WHERE id = ?',
-    [enabled ? 1 : 0, userId],
+    [Boolean(enabled), Number(userId)],
   );
 
   return getJobAlertPreference(userId);
@@ -158,7 +158,7 @@ export const fetchUsersWithJobAlertsEnabled = async () => {
     FROM users
     WHERE email IS NOT NULL
       AND email <> ''
-      AND COALESCE(job_alerts, 1) = 1
+      AND COALESCE(job_alerts, TRUE) = TRUE
       AND (status IS NULL OR UPPER(status) = 'ACTIVE')
   `);
 
@@ -198,7 +198,7 @@ export const getWeeklyJobMatchesForUser = async (userId) => {
       WHERE id = ?
       LIMIT 1
     `,
-    [userId],
+    [Number(userId)],
   );
 
   if (!users.length) return [];
@@ -213,7 +213,7 @@ const reserveWeeklyAlertSend = async (userId, weekStartDate, jobCount) => {
       INSERT IGNORE INTO weekly_job_alert_logs (user_id, week_start_date, job_count)
       VALUES (?, ?, ?)
     `,
-    [userId, weekStartDate, jobCount],
+    [Number(userId), weekStartDate, jobCount],
   );
 
   return result.affectedRows === 1;

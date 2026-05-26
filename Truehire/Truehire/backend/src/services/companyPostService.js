@@ -445,6 +445,7 @@ export const createRecruiterPost = async ({ recruiterId, caption, mediaItems = [
     `
       INSERT INTO company_posts (recruiter_id, company_id, caption, media_url, media_type, status)
       VALUES (?, ?, ?, ?, ?, 'ACTIVE')
+      RETURNING id
     `,
     [
       normalizeId(recruiterId, 'recruiter id'),
@@ -512,8 +513,8 @@ export const listCompanyPosts = async ({ companyId, viewerUserId = null }) => {
   const [rows] = await pool.query(
     `
       SELECT cp.*, r.company, r.company_name, r.company_logo,
-        CASE WHEN ? IS NOT NULL AND (cn.id IS NOT NULL OR cf.id IS NOT NULL) THEN 1 ELSE 0 END AS following,
-        CASE WHEN ? IS NOT NULL AND pl.id IS NOT NULL THEN 1 ELSE 0 END AS liked,
+        CASE WHEN CAST(? AS BIGINT) IS NOT NULL AND (cn.id IS NOT NULL OR cf.id IS NOT NULL) THEN 1 ELSE 0 END AS following,
+        CASE WHEN CAST(? AS BIGINT) IS NOT NULL AND pl.id IS NOT NULL THEN 1 ELSE 0 END AS liked,
         (SELECT COUNT(*) FROM post_likes likes WHERE likes.post_id = cp.id) AS like_count,
         (SELECT COUNT(*) FROM post_comments comments WHERE comments.post_id = cp.id) AS comment_count,
         (SELECT COUNT(*) FROM company_post_views views WHERE views.post_id = cp.id) AS view_count,
@@ -684,7 +685,7 @@ export const addPostComment = async ({ postId, userId, comment, authorRole = 'US
   }
 
   const [result] = await pool.query(
-    'INSERT INTO post_comments (post_id, user_id, author_role, parent_comment_id, comment) VALUES (?, ?, ?, ?, ?)',
+    'INSERT INTO post_comments (post_id, user_id, author_role, parent_comment_id, comment) VALUES (?, ?, ?, ?, ?) RETURNING id',
     [normalizedPostId, normalizedUserId, normalizedAuthorRole, normalizedParentCommentId, trimmed],
   );
 
@@ -855,6 +856,7 @@ export const createRecruiterStatus = async ({ recruiterId, caption, mediaUrl, me
     `
       INSERT INTO company_statuses (recruiter_id, company_id, caption, media_url, media_type, status, expires_at)
       VALUES (?, ?, ?, ?, ?, 'ACTIVE', DATE_ADD(NOW(), INTERVAL 24 HOUR))
+      RETURNING id
     `,
     [normalizeId(recruiterId, 'recruiter id'), company.id, caption || '', mediaUrl, mediaType],
   );
@@ -951,8 +953,8 @@ export const getCompanyStatusById = async ({ statusId, userId = null }) => {
   const [rows] = await pool.query(
     `
       SELECT cs.*, r.company, r.company_name, r.company_logo,
-        CASE WHEN ? IS NOT NULL AND (cn.id IS NOT NULL OR cf.id IS NOT NULL) THEN 1 ELSE 0 END AS following,
-        CASE WHEN ? IS NOT NULL AND csv.id IS NOT NULL THEN 1 ELSE 0 END AS viewed
+        CASE WHEN CAST(? AS BIGINT) IS NOT NULL AND (cn.id IS NOT NULL OR cf.id IS NOT NULL) THEN 1 ELSE 0 END AS following,
+        CASE WHEN CAST(? AS BIGINT) IS NOT NULL AND csv.id IS NOT NULL THEN 1 ELSE 0 END AS viewed
       FROM company_statuses cs
       INNER JOIN recruiters r ON r.id = cs.company_id
       LEFT JOIN company_network cn ON cn.company_id = cs.company_id AND cn.user_id = ?

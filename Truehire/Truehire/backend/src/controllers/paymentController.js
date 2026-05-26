@@ -122,7 +122,8 @@ const activateCompanyMessageAccess = async ({ userId, recruiterId, paymentId, or
   await pool.execute(
     `INSERT INTO user_company_message_access (user_id, recruiter_id, status, expires_at)
      VALUES (?, ?, 'ACTIVE', ?)
-     ON DUPLICATE KEY UPDATE status = 'ACTIVE', expires_at = VALUES(expires_at), updated_at = NOW()`,
+     ON CONFLICT (user_id, recruiter_id)
+     DO UPDATE SET status = 'ACTIVE', expires_at = EXCLUDED.expires_at, updated_at = NOW()`,
     [userId, recruiterId, expiresAt],
   );
 

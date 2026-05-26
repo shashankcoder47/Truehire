@@ -12,7 +12,7 @@ const normalizeId = (value, label) => {
     throw new ApiError(400, `Invalid ${label}`);
   }
 
-  return String(id);
+  return id;
 };
 
 const normalizeCompany = (company) => ({

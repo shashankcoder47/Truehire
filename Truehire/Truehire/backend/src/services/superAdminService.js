@@ -9,13 +9,17 @@ export const ensureSuperAdminRoleColumn = async () => {
 
   try {
     await prisma.$executeRawUnsafe(
-      "ALTER TABLE super_admins ADD COLUMN role VARCHAR(50) NOT NULL DEFAULT 'SUPER_ADMIN'",
+      "ALTER TABLE super_admins ADD COLUMN IF NOT EXISTS role VARCHAR(50) NOT NULL DEFAULT 'SUPER_ADMIN'",
     );
   } catch (error) {
     const message = String(error?.message || '');
+    const databaseCode = error?.meta?.code || error?.code;
     const duplicateColumn =
-      error?.code === 'P2010' &&
-      (message.includes('Duplicate column') || message.includes('ER_DUP_FIELDNAME'));
+      databaseCode === '42701' ||
+      (error?.code === 'P2010' &&
+        (message.includes('Duplicate column') ||
+          message.includes('ER_DUP_FIELDNAME') ||
+          message.includes('already exists')));
 
     if (!duplicateColumn) {
       throw error;

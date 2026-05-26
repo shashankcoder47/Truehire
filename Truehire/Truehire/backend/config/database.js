@@ -1,40 +1,25 @@
-const mysql = require('mysql2/promise');
+const { Pool } = require('pg');
 require('dotenv').config();
 
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || '127.0.0.1',
-  user: process.env.DB_USER || 'root',
+const pool = new Pool({
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || 'root',
-  database: process.env.DB_NAME || 'truehire',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  multipleStatements: true
+  database: process.env.DB_NAME || 'Truehire',
+  port: process.env.DB_PORT || 5432,
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
 });
 
 // Test database connection
 const testConnection = async () => {
   try {
-    // First connect without database to create it if needed
-    const tempPool = mysql.createPool({
-      host: process.env.DB_HOST || '127.0.0.1',
-      user: process.env.DB_USER || 'root',
-      password: process.env.DB_PASSWORD || 'root',
-      waitForConnections: true,
-      connectionLimit: 1,
-      queueLimit: 0,
-      multipleStatements: true
-    });
+    const client = await pool.connect();
 
-    const connection = await tempPool.getConnection();
-    await connection.execute(`CREATE DATABASE IF NOT EXISTS ${process.env.DB_NAME || 'truehire'}`);
-    connection.release();
-    tempPool.end();
+    console.log('PostgreSQL connected successfully');
 
-    // Now test connection with database
-    const dbConnection = await pool.getConnection();
-    console.log('Database connected successfully');
-    dbConnection.release();
+    client.release();
   } catch (error) {
     console.error('Database connection failed:', error.message);
     throw error;
@@ -43,5 +28,5 @@ const testConnection = async () => {
 
 module.exports = {
   pool,
-  testConnection
+  testConnection,
 };

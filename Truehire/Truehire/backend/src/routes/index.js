@@ -12,6 +12,7 @@ import notificationRoutes from './notificationRoutes.js';
 import paymentRoutes from './paymentRoutes.js';
 import reviewRoutes from './reviewRoutes.js';
 import userPostRoutes from './userPostRoutes.js';
+import { checkDatabaseHealth } from '../config/database.js';
 
 const router = Router();
 
@@ -19,6 +20,15 @@ router.get('/health', (_req, res) => {
   res.json({
     success: true,
     message: 'TrueHire API is healthy',
+  });
+});
+
+router.get('/health/database', async (_req, res) => {
+  const health = await checkDatabaseHealth();
+
+  res.status(health.ok ? 200 : 503).json({
+    success: health.ok,
+    database: health,
   });
 });
 

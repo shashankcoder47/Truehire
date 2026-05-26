@@ -125,7 +125,7 @@ export const calculateRecommendationScore = ({ job, user }) => {
 };
 
 export const getRecommendedJobsForUser = async (userId) => {
-  const normalizedUserId = String(userId);
+  const normalizedUserId = Number(userId);
   const [userRows] = await pool.execute(
     'SELECT id, core_skills, secondary_skills, soft_skills FROM users WHERE id = ? LIMIT 1',
     [normalizedUserId],
@@ -303,7 +303,7 @@ export const sendJobMatchNotificationsForJob = async (job) => {
        WHERE user_id = ?
          AND job_id = ?
        LIMIT 1`,
-      [String(user.id), String(job.id)],
+      [Number(user.id), Number(job.id)],
     );
 
     if (existingSend.length > 0) continue;
@@ -320,7 +320,7 @@ export const sendJobMatchNotificationsForJob = async (job) => {
       });
       await pool.execute(
         'INSERT IGNORE INTO job_recommendation_emails (user_id, job_id) VALUES (?, ?)',
-        [String(user.id), String(job.id)],
+        [Number(user.id), Number(job.id)],
       );
       emailed += 1;
     } catch (error) {

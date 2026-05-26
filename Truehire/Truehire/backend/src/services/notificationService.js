@@ -8,6 +8,8 @@ const statusCache = {
   read: 'READ',
 };
 
+const databaseId = (value) => Number(value);
+
 const parseMetadata = (value) => {
   if (!value) return null;
   if (typeof value === 'object') return value;
@@ -100,7 +102,7 @@ export const createNewJobPostedNotifications = async (job) => {
   await ensureUserNotificationsTable();
 
   const { unread } = await getUserNotificationStatusValues();
-  const companyId = String(job.recruiter_id);
+  const companyId = databaseId(job.recruiter_id);
   const jobId = String(job.id);
   const title = String(job.title || 'New Job').trim();
   const company = String(job.company || 'A company you follow').trim();
@@ -218,7 +220,7 @@ export const getNotificationsForUser = async (userId) => {
      WHERE user_id = ?
      ORDER BY created_at DESC
      LIMIT 100`,
-    [String(userId)],
+    [databaseId(userId)],
   );
 
   return rows.map(normalizeNotification);
@@ -230,7 +232,7 @@ export const countUnreadNotificationsForUser = async (userId) => {
 
   const [rows] = await pool.execute(
     'SELECT COUNT(*) AS unread_count FROM user_notifications WHERE user_id = ? AND status = ?',
-    [String(userId), unread],
+    [databaseId(userId), unread],
   );
 
   return Number(rows?.[0]?.unread_count || 0);
@@ -241,7 +243,7 @@ export const markNotificationAsRead = async (notificationId, userId) => {
 
   const [result] = await pool.execute(
     'UPDATE user_notifications SET status = ?, updated_at = NOW() WHERE id = ? AND user_id = ?',
-    [read, String(notificationId), String(userId)],
+    [read, databaseId(notificationId), databaseId(userId)],
   );
 
   return Number(result?.affectedRows || 0) > 0;
@@ -252,7 +254,7 @@ export const markAllNotificationsAsRead = async (userId) => {
 
   const [result] = await pool.execute(
     'UPDATE user_notifications SET status = ?, updated_at = NOW() WHERE user_id = ? AND status = ?',
-    [read, String(userId), unread],
+    [read, databaseId(userId), unread],
   );
 
   return Number(result?.affectedRows || 0);
@@ -261,7 +263,7 @@ export const markAllNotificationsAsRead = async (userId) => {
 export const clearNotificationsForUser = async (userId) => {
   const [result] = await pool.execute(
     'DELETE FROM user_notifications WHERE user_id = ?',
-    [String(userId)],
+    [databaseId(userId)],
   );
 
   return Number(result?.affectedRows || 0);
@@ -280,12 +282,13 @@ const insertUserNotification = async ({ userId, applicationId = null, message, m
      created_at,
      updated_at
    )
-   VALUES (?, ?, ?, CAST(? AS JSON), ?, NOW(), NOW())`;
+   VALUES (?, ?, ?, CAST(? AS JSON), ?, NOW(), NOW())
+   RETURNING id`;
 
   try {
     const [result] = await pool.execute(query, [
-      String(userId),
-      applicationId == null ? null : String(applicationId),
+      databaseId(userId),
+      applicationId == null ? null : databaseId(applicationId),
       message,
       serializedMetadata,
       unread,
@@ -297,7 +300,7 @@ const insertUserNotification = async ({ userId, applicationId = null, message, m
     }
 
     const [fallbackResult] = await pool.execute(query, [
-      String(userId),
+      databaseId(userId),
       null,
       message,
       serializedMetadata,
@@ -368,7 +371,7 @@ export const createFriendRequestNotification = async ({ receiverId, senderId, se
        updated_at
      )
      VALUES (?, NULL, ?, CAST(? AS JSON), ?, NOW(), NOW())`,
-    [String(receiverId), message, metadata, unread],
+    [databaseId(receiverId), message, metadata, unread],
   );
 };
 
@@ -386,7 +389,7 @@ export const createFriendRequestAcceptedNotification = async ({ senderId, receiv
   await pool.execute(
     `INSERT INTO user_notifications (user_id, application_id, message, metadata, status, created_at, updated_at)
      VALUES (?, NULL, ?, CAST(? AS JSON), ?, NOW(), NOW())`,
-    [String(senderId), message, metadata, unread],
+    [databaseId(senderId), message, metadata, unread],
   );
 };
 
@@ -404,7 +407,7 @@ export const createFollowBackNotification = async ({ receiverId, senderId, sende
   await pool.execute(
     `INSERT INTO user_notifications (user_id, application_id, message, metadata, status, created_at, updated_at)
      VALUES (?, NULL, ?, CAST(? AS JSON), ?, NOW(), NOW())`,
-    [String(receiverId), message, metadata, unread],
+    [databaseId(receiverId), message, metadata, unread],
   );
 };
 
@@ -422,6 +425,6 @@ export const createDirectMessageNotification = async ({ receiverId, senderId, se
   await pool.execute(
     `INSERT INTO user_notifications (user_id, application_id, message, metadata, status, created_at, updated_at)
      VALUES (?, NULL, ?, CAST(? AS JSON), ?, NOW(), NOW())`,
-    [String(receiverId), message, metadata, unread],
+    [databaseId(receiverId), message, metadata, unread],
   );
 };

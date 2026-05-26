@@ -27,16 +27,11 @@ const requireProductionValue = (name, value) => {
 
 const buildDatabaseUrl = () => {
   const host = process.env.DB_HOST ?? (isProduction ? '' : '127.0.0.1');
-  const port = process.env.DB_PORT ?? '3306';
-  const user = process.env.DB_USER ?? 'root';
+  const provider = process.env.DB_PROVIDER ?? 'postgresql';
+  const port = process.env.DB_PORT ?? (provider === 'postgresql' ? '5432' : '3306');
+  const user = process.env.DB_USER ?? (provider === 'postgresql' ? 'postgres' : 'root');
   const password = process.env.DB_PASSWORD ?? '';
   const database = process.env.DB_NAME ?? 'truehire';
-  const hasExplicitDbConfig =
-    process.env.DB_HOST ||
-    process.env.DB_PORT ||
-    process.env.DB_USER ||
-    process.env.DB_PASSWORD !== undefined ||
-    process.env.DB_NAME;
 
   let databaseUrl;
 
@@ -44,12 +39,10 @@ const buildDatabaseUrl = () => {
     throw new Error('DATABASE_URL or DB_HOST is required in production');
   }
 
-  if (hasExplicitDbConfig) {
-    databaseUrl = `mysql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}`;
-  } else if (process.env.DATABASE_URL) {
+  if (process.env.DATABASE_URL) {
     databaseUrl = process.env.DATABASE_URL;
   } else {
-    databaseUrl = `mysql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}`;
+    databaseUrl = `${provider}://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}`;
   }
 
   try {

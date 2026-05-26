@@ -1,4 +1,4 @@
-import { pool } from '../config/database.js';
+import { isPostgresDatabase, pool, prisma } from '../config/database.js';
 import { ApiError } from '../utils/apiError.js';
 
 const normalizeId = (value, label) => {
@@ -22,6 +22,87 @@ const normalizePost = (post) => ({
 });
 
 export const ensureUserPostTables = async () => {
+  if (isPostgresDatabase) {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS user_posts (
+        id BIGSERIAL PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        caption TEXT NULL,
+        media_url VARCHAR(1000) NULL,
+        media_type VARCHAR(30) NULL,
+        status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE',
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS user_post_media (
+        id BIGSERIAL PRIMARY KEY,
+        post_id BIGINT NOT NULL,
+        media_url VARCHAR(1000) NOT NULL,
+        media_type VARCHAR(30) NOT NULL,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS user_post_likes (
+        id BIGSERIAL PRIMARY KEY,
+        post_id BIGINT NOT NULL,
+        user_id BIGINT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS user_post_comments (
+        id BIGSERIAL PRIMARY KEY,
+        post_id BIGINT NOT NULL,
+        user_id BIGINT NOT NULL,
+        parent_comment_id BIGINT NULL,
+        comment TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS user_post_comment_likes (
+        id BIGSERIAL PRIMARY KEY,
+        comment_id BIGINT NOT NULL,
+        user_id BIGINT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS user_post_shares (
+        id BIGSERIAL PRIMARY KEY,
+        post_id BIGINT NOT NULL,
+        user_id BIGINT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS idx_user_posts_user_created ON user_posts (user_id, created_at)');
+    await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS idx_user_posts_status_created ON user_posts (status, created_at)');
+    await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS idx_user_post_media_post_order ON user_post_media (post_id, sort_order)');
+    await prisma.$executeRawUnsafe('CREATE UNIQUE INDEX IF NOT EXISTS uniq_user_post_likes_user_post ON user_post_likes (post_id, user_id)');
+    await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS idx_user_post_likes_post_id ON user_post_likes (post_id)');
+    await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS idx_user_post_likes_user_id ON user_post_likes (user_id)');
+    await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS idx_user_post_comments_post_created ON user_post_comments (post_id, created_at)');
+    await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS idx_user_post_comments_parent_created ON user_post_comments (parent_comment_id, created_at)');
+    await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS idx_user_post_comments_user_id ON user_post_comments (user_id)');
+    await prisma.$executeRawUnsafe('CREATE UNIQUE INDEX IF NOT EXISTS uniq_user_post_comment_likes_user_comment ON user_post_comment_likes (comment_id, user_id)');
+    await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS idx_user_post_comment_likes_comment_id ON user_post_comment_likes (comment_id)');
+    await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS idx_user_post_comment_likes_user_id ON user_post_comment_likes (user_id)');
+    await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS idx_user_post_shares_post_id ON user_post_shares (post_id)');
+    await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS idx_user_post_shares_user_id ON user_post_shares (user_id)');
+    return;
+  }
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_posts (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -210,6 +291,7 @@ export const createUserPost = async ({ userId, caption, mediaItems = [] }) => {
     `
       INSERT INTO user_posts (user_id, caption, media_url, media_type, status)
       VALUES (?, ?, ?, ?, 'ACTIVE')
+      RETURNING id
     `,
     [
       normalizeId(userId, 'user id'),
@@ -368,7 +450,7 @@ export const addUserPostComment = async ({ postId, userId, comment, parentCommen
   }
 
   const [result] = await pool.query(
-    'INSERT INTO user_post_comments (post_id, user_id, parent_comment_id, comment) VALUES (?, ?, ?, ?)',
+    'INSERT INTO user_post_comments (post_id, user_id, parent_comment_id, comment) VALUES (?, ?, ?, ?) RETURNING id',
     [normalizedPostId, normalizedUserId, normalizedParentCommentId, trimmed],
   );
 

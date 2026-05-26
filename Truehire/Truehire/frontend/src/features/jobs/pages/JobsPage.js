@@ -363,7 +363,7 @@ export default function Jobs() {
       const groupedLevels = {
         FRESHER: ['ENTRY_LEVEL'],
         INTERNSHIPS: ['INTERNSHIP_LEVEL'],
-        CAREER_GROWTH: ['SENIOR_LEVEL', 'EXECUTIVE_LEVEL']
+        CAREER_GROWTH: ['MID_LEVEL', 'SENIOR_LEVEL', 'EXECUTIVE_LEVEL']
       }
       const allowedLevels = groupedLevels[filters.experience_category] || []
       filtered = filtered.filter(job => allowedLevels.includes(normalizeExperienceLevel(job.experience_level)))

@@ -112,7 +112,7 @@ export const getFollowList = async (userId, type, viewerId = null) => {
        u.desired_job_role,
        u.current_location,
        CASE
-         WHEN ? IS NULL THEN 0
+         WHEN CAST(? AS BIGINT) IS NULL THEN FALSE
          ELSE EXISTS (
            SELECT 1
            FROM user_follows viewer_follows

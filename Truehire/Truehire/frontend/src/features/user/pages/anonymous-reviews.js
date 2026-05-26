@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import Link from 'next/link'
+import apiService from '../../../services/api'
 
 export default function AnonymousReviews() {
   const [user, setUser] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [reviews, setReviews] = useState([])
   const [showWriteReview, setShowWriteReview] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [newReview, setNewReview] = useState({
     company: '',
     rating: 5,
@@ -21,45 +23,23 @@ export default function AnonymousReviews() {
 
   const router = useRouter()
 
-  // Mock reviews data
-  const mockReviews = [
-    {
-      id: 1,
-      company: 'TechCorp',
-      rating: 4,
-      title: 'Great work-life balance but slow growth',
-      review: 'TechCorp offers excellent work-life balance with flexible hours and remote work options. The company culture is collaborative and supportive.',
-      pros: 'Flexible work hours, good benefits, collaborative culture',
-      cons: 'Limited career advancement opportunities, slow decision-making process',
-      advice: 'Great for mid-level professionals looking for stability',
-      date: '2024-01-15',
-      helpful: 23
-    },
-    {
-      id: 2,
-      company: 'InnovateLabs',
-      rating: 3,
-      title: 'Innovative but high pressure environment',
-      review: 'InnovateLabs is at the forefront of technology innovation. However, the work environment can be quite demanding with tight deadlines.',
-      pros: 'Cutting-edge technology, learning opportunities, competitive salary',
-      cons: 'High stress levels, long working hours, frequent overtime',
-      advice: 'Perfect for those who thrive under pressure and want to work on innovative projects',
-      date: '2024-01-10',
-      helpful: 18
-    },
-    {
-      id: 3,
-      company: 'DataFlow',
-      rating: 5,
-      title: 'Excellent company with great benefits',
-      review: 'DataFlow provides outstanding benefits including comprehensive health coverage, retirement plans, and professional development opportunities.',
-      pros: 'Excellent benefits, professional development, supportive management',
-      cons: 'Work can be repetitive at times',
-      advice: 'Ideal for career growth and long-term stability',
-      date: '2024-01-08',
-      helpful: 31
+  const formatReviewForPage = (review) => {
+    const message = String(review.review_message || '')
+    const [titleLine, ...bodyLines] = message.split('\n').filter(Boolean)
+
+    return {
+      id: review.id,
+      company: review.company_name || 'Company',
+      rating: Number(review.rating || 0),
+      title: titleLine || review.job_title || 'Company review',
+      review: bodyLines.join('\n') || message,
+      pros: '',
+      cons: '',
+      advice: '',
+      date: review.created_at ? new Date(review.created_at).toISOString().split('T')[0] : '',
+      helpful: 0
     }
-  ]
+  }
 
   useEffect(() => {
     // Check authentication
@@ -90,31 +70,74 @@ export default function AnonymousReviews() {
       }
     }
 
-    fetchUserData()
+    const fetchReviews = async () => {
+      try {
+        const response = await apiService.request('/reviews', { returnErrorObject: true })
+        if (!response?.error) {
+          const rawReviews = Array.isArray(response) ? response : response?.reviews || response?.data || []
+          setReviews(rawReviews.map(formatReviewForPage))
+        }
+      } catch (error) {
+        console.error('Failed to fetch reviews:', error)
+      }
+    }
 
-    // Load reviews
-    setReviews(mockReviews)
+    fetchUserData()
+    fetchReviews()
   }, [router])
 
-  const handleSubmitReview = (e) => {
+  const handleSubmitReview = async (e) => {
     e.preventDefault()
-    const review = {
-      id: reviews.length + 1,
-      ...newReview,
-      date: new Date().toISOString().split('T')[0],
-      helpful: 0
+
+    if (submitting) return
+
+    const reviewMessage = [
+      newReview.title,
+      newReview.review,
+      newReview.pros ? `Pros: ${newReview.pros}` : '',
+      newReview.cons ? `Cons: ${newReview.cons}` : '',
+      newReview.advice ? `Advice: ${newReview.advice}` : ''
+    ].filter(Boolean).join('\n')
+
+    const payload = {
+      rating: Number(newReview.rating),
+      review_message: reviewMessage,
+      user_name: user?.name || 'Anonymous User',
+      job_title: newReview.title || 'Company review',
+      company_name: newReview.company,
+      profile_image: user?.profile_photo || user?.profileImage || null
     }
-    setReviews([review, ...reviews])
-    setNewReview({
-      company: '',
-      rating: 5,
-      title: '',
-      review: '',
-      pros: '',
-      cons: '',
-      advice: ''
-    })
-    setShowWriteReview(false)
+
+    try {
+      setSubmitting(true)
+      const response = await apiService.request('/reviews', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        returnErrorObject: true
+      })
+
+      if (response?.error) {
+        alert(response.error || 'Unable to submit review right now.')
+        return
+      }
+
+      const createdReview = response?.review || response?.data || response
+      setReviews((prev) => [formatReviewForPage(createdReview), ...prev.filter((review) => String(review.id) !== String(createdReview.id))])
+      setNewReview({
+        company: '',
+        rating: 5,
+        title: '',
+        review: '',
+        pros: '',
+        cons: '',
+        advice: ''
+      })
+      setShowWriteReview(false)
+    } catch (error) {
+      alert('Unable to submit review right now.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const filteredReviews = reviews.filter(review => {
@@ -280,8 +303,8 @@ export default function AnonymousReviews() {
                 </div>
 
                 <div className="text-center">
-                  <button type="submit" className="btn btn-primary">
-                    Submit Review
+                  <button type="submit" disabled={submitting} className="btn btn-primary disabled:cursor-not-allowed disabled:opacity-70">
+                    {submitting ? 'Submitting...' : 'Submit Review'}
                   </button>
                 </div>
               </form>
