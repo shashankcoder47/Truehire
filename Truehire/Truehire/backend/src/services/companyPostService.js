@@ -1,5 +1,6 @@
 import { pool } from '../config/database.js';
 import { ApiError } from '../utils/apiError.js';
+import { buildPagination } from '../utils/pagination.js';
 
 const normalizeId = (value, label) => {
   const id = Number(value);
@@ -484,9 +485,13 @@ export const getRecruiterPostById = async (postId) => {
   return attachPostMedia(rows[0]);
 };
 
-export const listRecruiterPosts = async (recruiterId) => {
+export const listRecruiterPosts = async (recruiterId, pagination = {}) => {
   await ensureCompanyPostTables();
-  const [rows] = await pool.query(
+  const page = Number(pagination.page || 1);
+  const limit = Number(pagination.limit || 20);
+  const offset = Number(pagination.offset ?? pagination.skip ?? 0);
+  const [[rows], [countRows]] = await Promise.all([
+    pool.query(
     `
       SELECT cp.*, r.company, r.company_name, r.company_logo,
         0 AS liked,
@@ -499,18 +504,32 @@ export const listRecruiterPosts = async (recruiterId) => {
       INNER JOIN recruiters r ON r.id = cp.company_id
       WHERE cp.recruiter_id = ? AND cp.status <> 'DELETED'
       ORDER BY cp.created_at DESC
+      LIMIT ? OFFSET ?
     `,
-    [normalizeId(recruiterId, 'recruiter id')],
-  );
-  return attachPostMedia(rows);
+      [normalizeId(recruiterId, 'recruiter id'), limit, offset],
+    ),
+    pool.query(
+      "SELECT COUNT(*) AS total FROM company_posts WHERE recruiter_id = ? AND status <> 'DELETED'",
+      [normalizeId(recruiterId, 'recruiter id')],
+    ),
+  ]);
+  const posts = await attachPostMedia(rows);
+  return {
+    posts,
+    pagination: buildPagination({ page, limit, total: Number(countRows?.[0]?.total || 0) }),
+  };
 };
 
-export const listCompanyPosts = async ({ companyId, viewerUserId = null }) => {
+export const listCompanyPosts = async ({ companyId, viewerUserId = null, pagination = {} }) => {
   await ensureCompanyPostTables();
   const normalizedCompanyId = normalizeId(companyId, 'company id');
   const normalizedViewerId = viewerUserId ? normalizeId(viewerUserId, 'user id') : null;
+  const page = Number(pagination.page || 1);
+  const limit = Number(pagination.limit || 20);
+  const offset = Number(pagination.offset ?? pagination.skip ?? 0);
 
-  const [rows] = await pool.query(
+  const [[rows], [countRows]] = await Promise.all([
+    pool.query(
     `
       SELECT cp.*, r.company, r.company_name, r.company_logo,
         CASE WHEN CAST(? AS BIGINT) IS NOT NULL AND (cn.id IS NOT NULL OR cf.id IS NOT NULL) THEN 1 ELSE 0 END AS following,
@@ -526,6 +545,7 @@ export const listCompanyPosts = async ({ companyId, viewerUserId = null }) => {
       LEFT JOIN post_likes pl ON pl.post_id = cp.id AND pl.user_id = ?
       WHERE cp.company_id = ? AND UPPER(cp.status) = 'ACTIVE'
       ORDER BY cp.created_at DESC, cp.id DESC
+      LIMIT ? OFFSET ?
     `,
     [
       normalizedViewerId,
@@ -534,10 +554,21 @@ export const listCompanyPosts = async ({ companyId, viewerUserId = null }) => {
       normalizedViewerId,
       normalizedViewerId,
       normalizedCompanyId,
+      limit,
+      offset,
     ],
-  );
+    ),
+    pool.query(
+      "SELECT COUNT(*) AS total FROM company_posts WHERE company_id = ? AND UPPER(status) = 'ACTIVE'",
+      [normalizedCompanyId],
+    ),
+  ]);
 
-  return attachPostMedia(rows);
+  const posts = await attachPostMedia(rows);
+  return {
+    posts,
+    pagination: buildPagination({ page, limit, total: Number(countRows?.[0]?.total || 0) }),
+  };
 };
 
 export const updateRecruiterPost = async ({ postId, recruiterId, caption, mediaItems }) => {
@@ -576,13 +607,14 @@ export const deleteRecruiterPost = async ({ postId, recruiterId }) => {
   return { deleted: true };
 };
 
-export const getUserFeed = async ({ userId, limit = 8, offset = 0 }) => {
+export const getUserFeed = async ({ userId, limit = 8, offset = 0, page = 1 }) => {
   await ensureCompanyPostTables();
   const normalizedUserId = normalizeId(userId, 'user id');
-  const safeLimit = Math.min(Math.max(Number(limit) || 8, 1), 20);
+  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
   const safeOffset = Math.max(Number(offset) || 0, 0);
 
-  const [rows] = await pool.query(
+  const [[rows], [countRows]] = await Promise.all([
+    pool.query(
     `
       SELECT cp.*, r.company, r.company_name, r.company_logo,
         CASE WHEN cn.id IS NOT NULL OR cf.id IS NOT NULL THEN 1 ELSE 0 END AS following,
@@ -599,10 +631,18 @@ export const getUserFeed = async ({ userId, limit = 8, offset = 0 }) => {
       ORDER BY cp.created_at DESC, cp.id DESC
       LIMIT ? OFFSET ?
     `,
-    [normalizedUserId, normalizedUserId, normalizedUserId, safeLimit, safeOffset],
-  );
+      [normalizedUserId, normalizedUserId, normalizedUserId, safeLimit, safeOffset],
+    ),
+    pool.query(
+      "SELECT COUNT(*) AS total FROM company_posts WHERE UPPER(status) = 'ACTIVE'",
+    ),
+  ]);
 
-  return attachPostMedia(rows);
+  const posts = await attachPostMedia(rows);
+  return {
+    posts,
+    pagination: buildPagination({ page, limit: safeLimit, total: Number(countRows?.[0]?.total || 0) }),
+  };
 };
 
 export const markCompanyPostViewed = async ({ postId, userId }) => {
@@ -727,9 +767,14 @@ export const deletePostComment = async ({ postId, commentId, userId, authorRole 
   return { deleted: true };
 };
 
-export const getPostComments = async (postId) => {
+export const getPostComments = async (postId, pagination = {}) => {
   await ensureCompanyPostTables();
-  const [rows] = await pool.query(
+  const page = Number(pagination.page || 1);
+  const limit = Number(pagination.limit || 20);
+  const offset = Number(pagination.offset ?? pagination.skip ?? 0);
+  const normalizedPostId = normalizeId(postId, 'post id');
+  const [[rows], [countRows]] = await Promise.all([
+    pool.query(
     `
       SELECT
         pc.id,
@@ -750,10 +795,16 @@ export const getPostComments = async (postId) => {
       LEFT JOIN recruiters r ON r.id = pc.user_id
       WHERE pc.post_id = ?
       ORDER BY COALESCE(pc.parent_comment_id, pc.id) ASC, pc.parent_comment_id IS NOT NULL ASC, pc.created_at ASC
+      LIMIT ? OFFSET ?
     `,
-    [normalizeId(postId, 'post id')],
-  );
-  return rows.map((row) => ({
+      [normalizedPostId, limit, offset],
+    ),
+    pool.query(
+      'SELECT COUNT(*) AS total FROM post_comments WHERE post_id = ?',
+      [normalizedPostId],
+    ),
+  ]);
+  const comments = rows.map((row) => ({
     ...row,
     id: String(row.id),
     post_id: String(row.post_id),
@@ -762,6 +813,10 @@ export const getPostComments = async (postId) => {
     parent_comment_id: row.parent_comment_id != null ? String(row.parent_comment_id) : null,
     like_count: Number(row.like_count || 0),
   }));
+  return {
+    comments,
+    pagination: buildPagination({ page, limit, total: Number(countRows?.[0]?.total || 0) }),
+  };
 };
 
 export const togglePostCommentLike = async ({ commentId, userId, authorRole = 'USER' }) => {

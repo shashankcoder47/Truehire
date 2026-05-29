@@ -29,6 +29,7 @@ import {
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/apiError.js';
 import { uploadArray, uploadMimeTypes, uploadSingle } from '../utils/upload.js';
+import { getPagination } from '../utils/pagination.js';
 
 const router = Router();
 
@@ -106,11 +107,17 @@ router.get(
   authenticate,
   recruiterOnly,
   asyncHandler(async (req, res) => {
-    const [posts, profile] = await Promise.all([
-      listRecruiterPosts(req.auth.sub),
+    const [postResult, profile] = await Promise.all([
+      listRecruiterPosts(req.auth.sub, getPagination(req.query)),
       getRecruiterCompanyProfile(req.auth.sub),
     ]);
-    res.json({ success: true, posts, profile });
+    res.json({
+      success: true,
+      posts: postResult.posts,
+      data: postResult.posts,
+      pagination: postResult.pagination,
+      profile,
+    });
   }),
 );
 
@@ -118,11 +125,21 @@ router.get(
   '/companies/:id/posts',
   authenticate,
   asyncHandler(async (req, res) => {
-    const [posts, profile] = await Promise.all([
-      listCompanyPosts({ companyId: req.params.id, viewerUserId: req.auth.sub }),
+    const [postResult, profile] = await Promise.all([
+      listCompanyPosts({
+        companyId: req.params.id,
+        viewerUserId: req.auth.sub,
+        pagination: getPagination(req.query),
+      }),
       getRecruiterCompanyProfile(req.params.id),
     ]);
-    res.json({ success: true, posts, profile });
+    res.json({
+      success: true,
+      posts: postResult.posts,
+      data: postResult.posts,
+      pagination: postResult.pagination,
+      profile,
+    });
   }),
 );
 
@@ -221,10 +238,22 @@ router.get(
   authenticate,
   userOnly,
   asyncHandler(async (req, res) => {
-    const limit = Number(req.query.limit || 8);
-    const offset = Number(req.query.offset || 0);
-    const posts = await getUserFeed({ userId: req.auth.sub, limit, offset });
-    res.json({ success: true, posts, nextOffset: offset + posts.length, hasMore: posts.length === Math.min(Math.max(limit || 8, 1), 20) });
+    const pagination = getPagination(req.query);
+    const offset = Number(req.query.offset ?? pagination.offset);
+    const result = await getUserFeed({
+      userId: req.auth.sub,
+      limit: pagination.limit,
+      offset,
+      page: pagination.page,
+    });
+    res.json({
+      success: true,
+      posts: result.posts,
+      data: result.posts,
+      pagination: result.pagination,
+      nextOffset: offset + result.posts.length,
+      hasMore: result.posts.length === pagination.limit,
+    });
   }),
 );
 
@@ -297,8 +326,13 @@ router.get(
   '/posts/:id/comments',
   authenticate,
   asyncHandler(async (req, res) => {
-    const comments = await getPostComments(req.params.id);
-    res.json({ success: true, comments });
+    const result = await getPostComments(req.params.id, getPagination(req.query));
+    res.json({
+      success: true,
+      comments: result.comments,
+      data: result.comments,
+      pagination: result.pagination,
+    });
   }),
 );
 

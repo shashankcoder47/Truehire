@@ -80,6 +80,19 @@ const normalizePositiveId = (value, label) => {
   return { value: parsed };
 };
 
+const getMessagePagination = (query = {}) => {
+  const parsedLimit = Number.parseInt(query.limit, 10);
+  const limit = Math.min(Math.max(Number.isInteger(parsedLimit) ? parsedLimit : 30, 1), 100);
+  const beforeMessageId = query.beforeMessageId
+    ? Number.parseInt(query.beforeMessageId, 10)
+    : null;
+
+  return {
+    limit,
+    beforeMessageId: Number.isInteger(beforeMessageId) && beforeMessageId > 0 ? beforeMessageId : null,
+  };
+};
+
 const getCompanyMessageEligibility = async (userId, companyId) => {
   const [[companyRows], [followRows], [accessRows]] = await Promise.all([
     pool.execute(
@@ -159,7 +172,12 @@ router.get(
   asyncHandler(async (req, res) => {
     const actorType = ensureDirectActor(req, res);
     if (!actorType) return;
-    const messages = await listDirectMessages(req.params.conversationId, req.auth.sub, actorType);
+    const messages = await listDirectMessages(
+      req.params.conversationId,
+      req.auth.sub,
+      actorType,
+      getMessagePagination(req.query),
+    );
     res.json({ success: true, messages });
   }),
 );
@@ -482,14 +500,19 @@ router.get(
       },
     });
 
+    const messagePagination = getMessagePagination(req.query);
     const messages = await prisma.application_messages.findMany({
       where: {
         application_id: BigInt(applicationId),
+        ...(messagePagination.beforeMessageId
+          ? { id: { lt: BigInt(messagePagination.beforeMessageId) } }
+          : {}),
       },
       orderBy: [
-        { created_at: 'asc' },
-        { id: 'asc' },
+        { created_at: 'desc' },
+        { id: 'desc' },
       ],
+      take: messagePagination.limit,
       select: {
         id: true,
         conversation_id: true,
@@ -523,6 +546,33 @@ router.get(
       },
     });
 
+    const normalizedMessages = messages.reverse().map((message) => ({
+      id: Number(message.id),
+      conversationId: Number(message.conversation_id),
+      applicationId: Number(message.application_id),
+      jobId: Number(message.job_id),
+      senderId: Number(message.sender_id),
+      senderRole: normalizeRoleForResponse(message.sender_role),
+      receiverId: Number(message.receiver_id),
+      receiverRole: normalizeRoleForResponse(message.receiver_role),
+      message: message.message,
+      readStatus: normalizeReadStatus(Boolean(message.read_status)),
+      readAt: message.read_at,
+      isPinned: Boolean(message.is_pinned),
+      pinnedAt: message.pinned_at,
+      pinnedByRole: normalizeRoleForResponse(message.pinned_by_role),
+      pinnedById: message.pinned_by_id != null ? Number(message.pinned_by_id) : null,
+      createdAt: message.created_at,
+      attachments: message.application_message_attachments.map((attachment) => ({
+        id: Number(attachment.id),
+        filePath: attachment.file_path,
+        fileName: attachment.file_name,
+        fileType: attachment.file_type,
+        fileSize: attachment.file_size != null ? Number(attachment.file_size) : null,
+        createdAt: attachment.created_at,
+      })),
+    }));
+
     res.json({
       success: true,
       conversation: conversation
@@ -545,32 +595,12 @@ router.get(
           }
         : null,
       application,
-      messages: messages.map((message) => ({
-        id: Number(message.id),
-        conversationId: Number(message.conversation_id),
-        applicationId: Number(message.application_id),
-        jobId: Number(message.job_id),
-        senderId: Number(message.sender_id),
-        senderRole: normalizeRoleForResponse(message.sender_role),
-        receiverId: Number(message.receiver_id),
-        receiverRole: normalizeRoleForResponse(message.receiver_role),
-        message: message.message,
-        readStatus: normalizeReadStatus(Boolean(message.read_status)),
-        readAt: message.read_at,
-        isPinned: Boolean(message.is_pinned),
-        pinnedAt: message.pinned_at,
-        pinnedByRole: normalizeRoleForResponse(message.pinned_by_role),
-        pinnedById: message.pinned_by_id != null ? Number(message.pinned_by_id) : null,
-        createdAt: message.created_at,
-        attachments: message.application_message_attachments.map((attachment) => ({
-          id: Number(attachment.id),
-          filePath: attachment.file_path,
-          fileName: attachment.file_name,
-          fileType: attachment.file_type,
-          fileSize: attachment.file_size != null ? Number(attachment.file_size) : null,
-          createdAt: attachment.created_at,
-        })),
-      })),
+      messages: normalizedMessages,
+      pagination: {
+        limit: messagePagination.limit,
+        beforeMessageId: messagePagination.beforeMessageId,
+        hasMore: messages.length === messagePagination.limit,
+      },
     });
   }),
 );

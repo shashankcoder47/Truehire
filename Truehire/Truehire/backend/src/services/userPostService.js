@@ -1,5 +1,6 @@
 import { isPostgresDatabase, pool, prisma } from '../config/database.js';
 import { ApiError } from '../utils/apiError.js';
+import { buildPagination } from '../utils/pagination.js';
 
 const normalizeId = (value, label) => {
   const id = Number(value);
@@ -305,10 +306,13 @@ export const createUserPost = async ({ userId, caption, mediaItems = [] }) => {
   return getUserPostById({ postId: result.insertId, viewerId: userId });
 };
 
-export const listUserPosts = async ({ userId, viewerId, type = 'all' }) => {
+export const listUserPosts = async ({ userId, viewerId, type = 'all', pagination = {} }) => {
   await ensureUserPostTables();
   const normalizedUserId = normalizeId(userId, 'user id');
   const normalizedViewerId = normalizeId(viewerId, 'viewer id');
+  const page = Number(pagination.page || 1);
+  const limit = Number(pagination.limit || 20);
+  const offset = Number(pagination.offset ?? pagination.skip ?? 0);
   const normalizedType = String(type || 'all').toLowerCase();
   const mediaFilter = normalizedType === 'images'
     ? "AND EXISTS (SELECT 1 FROM user_post_media upm WHERE upm.post_id = up.id AND upm.media_type = 'image')"
@@ -316,7 +320,8 @@ export const listUserPosts = async ({ userId, viewerId, type = 'all' }) => {
       ? "AND EXISTS (SELECT 1 FROM user_post_media upm WHERE upm.post_id = up.id AND upm.media_type = 'video')"
       : '';
 
-  const [rows] = await pool.query(
+  const [[rows], [countRows]] = await Promise.all([
+    pool.query(
     `
       SELECT up.*, COALESCE(u.name, 'Deleted user') AS user_name, u.profile_photo,
         CASE WHEN upl.id IS NOT NULL THEN 1 ELSE 0 END AS liked,
@@ -329,20 +334,36 @@ export const listUserPosts = async ({ userId, viewerId, type = 'all' }) => {
       WHERE up.user_id = ? AND UPPER(up.status) = 'ACTIVE'
       ${mediaFilter}
       ORDER BY up.created_at DESC
+      LIMIT ? OFFSET ?
     `,
-    [normalizedViewerId, normalizedUserId],
-  );
+      [normalizedViewerId, normalizedUserId, limit, offset],
+    ),
+    pool.query(
+      `
+        SELECT COUNT(*) AS total
+        FROM user_posts up
+        WHERE up.user_id = ? AND UPPER(up.status) = 'ACTIVE'
+        ${mediaFilter}
+      `,
+      [normalizedUserId],
+    ),
+  ]);
 
-  return attachPostMedia(rows);
+  const posts = await attachPostMedia(rows);
+  return {
+    posts,
+    pagination: buildPagination({ page, limit, total: Number(countRows?.[0]?.total || 0) }),
+  };
 };
 
-export const listFollowedUserPosts = async ({ userId, limit = 8, offset = 0 }) => {
+export const listFollowedUserPosts = async ({ userId, limit = 8, offset = 0, page = 1 }) => {
   await ensureUserPostTables();
   const normalizedUserId = normalizeId(userId, 'user id');
-  const safeLimit = Math.min(Math.max(Number(limit) || 8, 1), 20);
+  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
   const safeOffset = Math.max(Number(offset) || 0, 0);
 
-  const [rows] = await pool.query(
+  const [[rows], [countRows]] = await Promise.all([
+    pool.query(
     `
       SELECT up.*, COALESCE(u.name, 'Deleted user') AS user_name, u.profile_photo,
         CASE WHEN upl.id IS NOT NULL THEN 1 ELSE 0 END AS liked,
@@ -358,14 +379,29 @@ export const listFollowedUserPosts = async ({ userId, limit = 8, offset = 0 }) =
       ORDER BY up.created_at DESC, up.id DESC
       LIMIT ? OFFSET ?
     `,
-    [normalizedUserId, normalizedUserId, safeLimit, safeOffset],
-  );
+      [normalizedUserId, normalizedUserId, safeLimit, safeOffset],
+    ),
+    pool.query(
+      `
+        SELECT COUNT(*) AS total
+        FROM user_posts up
+        INNER JOIN user_follows uf ON uf.following_id = up.user_id
+        WHERE uf.follower_id = ?
+          AND UPPER(up.status) = 'ACTIVE'
+      `,
+      [normalizedUserId],
+    ),
+  ]);
 
   const posts = await attachPostMedia(rows);
-  return (Array.isArray(posts) ? posts : posts ? [posts] : []).map((post) => ({
+  const normalizedPosts = (Array.isArray(posts) ? posts : posts ? [posts] : []).map((post) => ({
     ...post,
     post_type: 'user',
   }));
+  return {
+    posts: normalizedPosts,
+    pagination: buildPagination({ page, limit: safeLimit, total: Number(countRows?.[0]?.total || 0) }),
+  };
 };
 
 export const getUserPostById = async ({ postId, viewerId }) => {
@@ -463,9 +499,14 @@ export const addUserPostComment = async ({ postId, userId, comment, parentCommen
   };
 };
 
-export const getUserPostComments = async (postId) => {
+export const getUserPostComments = async (postId, pagination = {}) => {
   await ensureUserPostTables();
-  const [rows] = await pool.query(
+  const page = Number(pagination.page || 1);
+  const limit = Number(pagination.limit || 20);
+  const offset = Number(pagination.offset ?? pagination.skip ?? 0);
+  const normalizedPostId = normalizeId(postId, 'post id');
+  const [[rows], [countRows]] = await Promise.all([
+    pool.query(
     `
       SELECT upc.*, COALESCE(u.name, 'User') AS user_name,
         (SELECT COUNT(*) FROM user_post_comment_likes upcl WHERE upcl.comment_id = upc.id) AS like_count
@@ -473,10 +514,16 @@ export const getUserPostComments = async (postId) => {
       LEFT JOIN users u ON u.id = upc.user_id
       WHERE upc.post_id = ?
       ORDER BY COALESCE(upc.parent_comment_id, upc.id) ASC, upc.parent_comment_id IS NOT NULL ASC, upc.created_at ASC
+      LIMIT ? OFFSET ?
     `,
-    [normalizeId(postId, 'post id')],
-  );
-  return rows.map((row) => ({
+      [normalizedPostId, limit, offset],
+    ),
+    pool.query(
+      'SELECT COUNT(*) AS total FROM user_post_comments WHERE post_id = ?',
+      [normalizedPostId],
+    ),
+  ]);
+  const comments = rows.map((row) => ({
     ...row,
     id: String(row.id),
     post_id: String(row.post_id),
@@ -484,6 +531,11 @@ export const getUserPostComments = async (postId) => {
     parent_comment_id: row.parent_comment_id != null ? String(row.parent_comment_id) : null,
     like_count: Number(row.like_count || 0),
   }));
+
+  return {
+    comments,
+    pagination: buildPagination({ page, limit, total: Number(countRows?.[0]?.total || 0) }),
+  };
 };
 
 export const deleteUserPostComment = async ({ postId, commentId, userId }) => {

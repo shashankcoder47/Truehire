@@ -2,19 +2,26 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 import Head from 'next/head'
+import { motion } from 'framer-motion'
 import {
   BadgeCheck,
+  Bell,
+  Briefcase,
+  ClipboardList,
   FileVideo,
   ImagePlus,
+  LayoutDashboard,
+  LogOut,
+  MessageSquare,
   Send,
+  Settings,
   SmilePlus,
   Sparkles,
   Type,
   Upload,
+  Users,
   X
 } from 'lucide-react'
-import Header from '../Header'
-import Footer from '../Footer'
 import apiService from '../../../utils/api'
 import { useAuth } from '../../../context/AuthContext'
 
@@ -669,7 +676,7 @@ export default function RecruiterDashboard() {
       fetchRecruiterJobs()
     }
 
-    const interval = setInterval(refreshJobs, 10000)
+    const interval = setInterval(refreshJobs, 60000)
     window.addEventListener('focus', refreshJobs)
 
     return () => {

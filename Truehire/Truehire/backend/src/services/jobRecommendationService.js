@@ -124,15 +124,29 @@ export const calculateRecommendationScore = ({ job, user }) => {
   };
 };
 
-export const getRecommendedJobsForUser = async (userId) => {
+export const getRecommendedJobsForUser = async (userId, pagination = {}) => {
   const normalizedUserId = Number(userId);
+  return getRecommendedJobsForUserPaginated(normalizedUserId, pagination);
+};
+
+export const getRecommendedJobsForUserPaginated = async (userId, pagination = {}) => {
+  const normalizedUserId = Number(userId);
+  const page = Number(pagination.page || 1);
+  const limit = Number(pagination.limit || 20);
+  const skip = Number(pagination.skip || 0);
+  const candidateLimit = Math.min(Math.max((skip + limit) * 5, limit * 5), 500);
   const [userRows] = await pool.execute(
     'SELECT id, core_skills, secondary_skills, soft_skills FROM users WHERE id = ? LIMIT 1',
     [normalizedUserId],
   );
   const user = userRows[0];
 
-  if (!user) return [];
+  if (!user) {
+    return {
+      jobs: [],
+      pagination: { page, limit, total: 0, pages: 0, totalPages: 0 },
+    };
+  }
 
   const [jobs] = await pool.execute(
     `SELECT
@@ -156,17 +170,36 @@ export const getRecommendedJobsForUser = async (userId) => {
       FROM jobs
       WHERE status = 'OPEN'
         AND (application_deadline IS NULL OR application_deadline >= CURDATE())
-      ORDER BY created_at DESC`,
+      ORDER BY created_at DESC
+      LIMIT ?`,
+    [candidateLimit],
   );
 
-  const [applications] = await pool.execute(
-    'SELECT job_id FROM job_applications WHERE user_id = ?',
-    [normalizedUserId],
+  const jobIds = jobs.map((job) => Number(job.id)).filter(Number.isFinite);
+  const [applications] = jobIds.length
+    ? await pool.execute(
+        `SELECT job_id
+         FROM job_applications
+         WHERE user_id = ?
+           AND job_id IN (${jobIds.map(() => '?').join(', ')})`,
+        [normalizedUserId, ...jobIds],
+      )
+    : [[]];
+
+  const [openJobRows] = await pool.execute(
+    `SELECT COUNT(*) AS total
+     FROM jobs
+     WHERE status = 'OPEN'
+       AND (application_deadline IS NULL OR application_deadline >= CURDATE())`,
   );
+
+  const appliedTotal = applications.length;
+  const totalOpenJobs = Number(openJobRows?.[0]?.total || 0);
+  const estimatedTotal = Math.max(0, totalOpenJobs - appliedTotal);
 
   const appliedJobIds = new Set(applications.map((application) => String(application.job_id)));
 
-  return dedupeJobs(jobs)
+  const recommendedJobs = dedupeJobs(jobs)
     .filter((job) => !appliedJobIds.has(String(job.id)))
     .map((job) => {
       const match = calculateRecommendationScore({ job, user });
@@ -187,6 +220,30 @@ export const getRecommendedJobsForUser = async (userId) => {
       if (b.recommendationScore !== a.recommendationScore) return b.recommendationScore - a.recommendationScore;
       return new Date(b.created_at || 0) - new Date(a.created_at || 0);
     });
+
+  const paginationTotal = Math.min(
+    estimatedTotal,
+    Math.max(recommendedJobs.length, skip + recommendedJobs.length),
+  );
+
+  return {
+    jobs: recommendedJobs.slice(skip, skip + limit),
+    pagination: {
+      page,
+      limit,
+      total: paginationTotal,
+      pages: Math.ceil(paginationTotal / limit),
+      totalPages: Math.ceil(paginationTotal / limit),
+    },
+  };
+};
+
+const getEmailCandidateBatch = async ({ limit, offset }) => {
+  const [users] = await pool.execute(
+    'SELECT id, name, email, core_skills, secondary_skills, soft_skills FROM users LIMIT ? OFFSET ?',
+    [limit, offset],
+  );
+  return users;
 };
 
 const ensureRecommendationEmailTable = async () => {
@@ -282,55 +339,61 @@ export const sendJobMatchNotificationsForJob = async (job) => {
   const requiredSkills = getRequiredSkills(job);
   if (!requiredSkills.length) return { checked: 0, matched: 0, emailed: 0 };
 
-  const [users] = await pool.execute(
-    'SELECT id, name, email, core_skills, secondary_skills, soft_skills FROM users',
-  );
-
+  const batchSize = 50;
+  let offset = 0;
+  let checked = 0;
   let matched = 0;
   let emailed = 0;
   await ensureRecommendationEmailTable();
 
-  for (const user of users) {
-    if (!user.email) continue;
+  while (true) {
+    const users = await getEmailCandidateBatch({ limit: batchSize, offset });
+    if (!users.length) break;
+    checked += users.length;
+    offset += batchSize;
 
-    const match = calculateRecommendationScore({ job, user });
-    if (match.score <= 0) continue;
+    for (const user of users) {
+      if (!user.email) continue;
 
-    matched += 1;
-    const [existingSend] = await pool.execute(
-      `SELECT id
-       FROM job_recommendation_emails
-       WHERE user_id = ?
-         AND job_id = ?
-       LIMIT 1`,
-      [Number(user.id), Number(job.id)],
-    );
+      const match = calculateRecommendationScore({ job, user });
+      if (match.score <= 0) continue;
 
-    if (existingSend.length > 0) continue;
-
-    if (!hasEmailConfig) {
-      continue;
-    }
-
-    try {
-      await sendEmail({
-        to: user.email,
-        subject: 'New Job Match Found',
-        html: buildJobMatchEmail({ user, job, requiredSkills: match.requiredSkills }),
-      });
-      await pool.execute(
-        'INSERT IGNORE INTO job_recommendation_emails (user_id, job_id) VALUES (?, ?)',
+      matched += 1;
+      const [existingSend] = await pool.execute(
+        `SELECT id
+         FROM job_recommendation_emails
+         WHERE user_id = ?
+           AND job_id = ?
+         LIMIT 1`,
         [Number(user.id), Number(job.id)],
       );
-      emailed += 1;
-    } catch (error) {
-      console.error('Failed to send job match email:', {
-        userId: String(user.id),
-        jobId: String(job.id),
-        error: error?.message || error,
-      });
+
+      if (existingSend.length > 0) continue;
+
+      if (!hasEmailConfig) {
+        continue;
+      }
+
+      try {
+        await sendEmail({
+          to: user.email,
+          subject: 'New Job Match Found',
+          html: buildJobMatchEmail({ user, job, requiredSkills: match.requiredSkills }),
+        });
+        await pool.execute(
+          'INSERT IGNORE INTO job_recommendation_emails (user_id, job_id) VALUES (?, ?)',
+          [Number(user.id), Number(job.id)],
+        );
+        emailed += 1;
+      } catch (error) {
+        console.error('Failed to send job match email:', {
+          userId: String(user.id),
+          jobId: String(job.id),
+          error: error?.message || error,
+        });
+      }
     }
   }
 
-  return { checked: users.length, matched, emailed };
+  return { checked, matched, emailed };
 };

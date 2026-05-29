@@ -1,5 +1,6 @@
 import { prisma } from '../config/database.js';
 import { ApiError } from '../utils/apiError.js';
+import { buildPagination } from '../utils/pagination.js';
 import {
   calculateResumeMatch,
   extractResumeText,
@@ -186,7 +187,35 @@ export const getAllJobs = async (options = {}) => {
   return dedupeJobs(jobs).slice(0, take).map(normalizeJob);
 };
 
-export const getRecruiterJobs = async (recruiterId) => {
+export const getRecruiterJobs = async (recruiterId, pagination = {}) => {
+  const { page = 1, limit = 20, skip = 0, take = limit } = pagination;
+  const where = {
+    recruiter_id: normalizeRecruiterId(recruiterId),
+  };
+  const fetchTake = Math.min(take * 5, 500);
+
+  const [jobs, total] = await prisma.$transaction([
+    prisma.jobs.findMany({
+      where,
+      orderBy: {
+        created_at: 'desc',
+      },
+      skip,
+      take: fetchTake,
+      select: listJobSelect,
+    }),
+    prisma.jobs.count({ where }),
+  ]);
+
+  const normalizedJobs = dedupeJobs(jobs).slice(0, take).map(normalizeJob);
+
+  return {
+    jobs: normalizedJobs,
+    pagination: buildPagination({ page, limit: take, total }),
+  };
+};
+
+export const getRecruiterJobsList = async (recruiterId) => {
   const jobs = await prisma.jobs.findMany({
     where: {
       recruiter_id: normalizeRecruiterId(recruiterId),
@@ -194,6 +223,7 @@ export const getRecruiterJobs = async (recruiterId) => {
     orderBy: {
       created_at: 'desc',
     },
+    take: 100,
     select: listJobSelect,
   });
 

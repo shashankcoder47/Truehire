@@ -39,6 +39,7 @@ export const ensureDirectMessageTables = async () => {
       created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
       KEY idx_direct_message_reply_to (reply_to_message_id),
       KEY idx_direct_message_conversation (conversation_id),
+      KEY idx_direct_message_conversation_created (conversation_id, created_at, id),
       KEY idx_direct_message_receiver_read (receiver_id, is_read),
       KEY idx_direct_message_created (created_at)
     )
@@ -77,6 +78,11 @@ export const ensureDirectMessageTables = async () => {
   }
   try {
     await pool.execute('ALTER TABLE user_direct_conversation_messages ADD KEY idx_direct_message_reply_to (reply_to_message_id)');
+  } catch (error) {
+    if (error?.code !== 'ER_DUP_KEYNAME') throw error;
+  }
+  try {
+    await pool.execute('ALTER TABLE user_direct_conversation_messages ADD KEY idx_direct_message_conversation_created (conversation_id, created_at, id)');
   } catch (error) {
     if (error?.code !== 'ER_DUP_KEYNAME') throw error;
   }
@@ -278,8 +284,14 @@ export const listDirectConversations = async (userId, actorType = 'USER') => {
   }));
 };
 
-export const listDirectMessages = async (conversationId, userId, actorType = 'USER') => {
+export const listDirectMessages = async (conversationId, userId, actorType = 'USER', options = {}) => {
   await assertConversationAccess(conversationId, userId, actorType);
+  const limit = Math.min(Math.max(Number.parseInt(options.limit, 10) || 30, 1), 100);
+  const beforeMessageId = options.beforeMessageId ? toId(options.beforeMessageId, 'before message id') : null;
+  const beforeClause = beforeMessageId ? 'AND m.id < ?' : '';
+  const params = beforeMessageId
+    ? [toId(conversationId, 'conversation id'), beforeMessageId, limit]
+    : [toId(conversationId, 'conversation id'), limit];
   const [rows] = await pool.execute(
     `SELECT
        m.id,
@@ -301,10 +313,12 @@ export const listDirectMessages = async (conversationId, userId, actorType = 'US
      LEFT JOIN user_direct_conversation_messages replied
        ON replied.id = m.reply_to_message_id AND replied.conversation_id = m.conversation_id
      WHERE m.conversation_id = ?
-     ORDER BY m.created_at ASC, m.id ASC`,
-    [toId(conversationId, 'conversation id')],
+       ${beforeClause}
+     ORDER BY m.created_at DESC, m.id DESC
+     LIMIT ?`,
+    params,
   );
-  return rows.map((row) => ({
+  return rows.reverse().map((row) => ({
     id: String(row.id),
     conversationId: String(row.conversation_id),
     senderId: String(row.sender_id),

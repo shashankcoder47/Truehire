@@ -8,6 +8,7 @@ import {
   markAllNotificationsAsRead,
   markNotificationAsRead,
 } from '../services/notificationService.js';
+import { getPagination } from '../utils/pagination.js';
 
 const router = Router();
 
@@ -16,14 +17,17 @@ router.use(authenticate, userOnly);
 router.get(
   '/',
   asyncHandler(async (req, res) => {
-    const [notifications, unreadCount] = await Promise.all([
-      getNotificationsForUser(req.auth.sub),
+    const pagination = getPagination(req.query);
+    const [notificationResult, unreadCount] = await Promise.all([
+      getNotificationsForUser(req.auth.sub, pagination),
       countUnreadNotificationsForUser(req.auth.sub),
     ]);
 
     res.json({
       success: true,
-      notifications,
+      notifications: notificationResult.notifications,
+      data: notificationResult.notifications,
+      pagination: notificationResult.pagination,
       unreadCount,
     });
   }),
@@ -45,14 +49,17 @@ router.patch(
   '/read-all',
   asyncHandler(async (req, res) => {
     await markAllNotificationsAsRead(req.auth.sub);
-    const [notifications, unreadCount] = await Promise.all([
-      getNotificationsForUser(req.auth.sub),
+    const pagination = getPagination(req.query);
+    const [notificationResult, unreadCount] = await Promise.all([
+      getNotificationsForUser(req.auth.sub, pagination),
       countUnreadNotificationsForUser(req.auth.sub),
     ]);
 
     res.json({
       success: true,
-      notifications,
+      notifications: notificationResult.notifications,
+      data: notificationResult.notifications,
+      pagination: notificationResult.pagination,
       unreadCount,
     });
   }),

@@ -1,5 +1,6 @@
 import { prisma } from '../config/database.js';
 import { ApiError } from '../utils/apiError.js';
+import { buildPagination } from '../utils/pagination.js';
 import { sendShortlistedEmail } from '../utils/sendEmail.js';
 
 const recruiterSelect = {
@@ -230,95 +231,90 @@ const normalizeApplicationRecord = (application, detailedApplication = null) => 
   };
 };
 
-export const getRecruiterApplications = async (recruiterId) => {
+export const getRecruiterApplications = async (recruiterId, pagination = {}) => {
   const normalizedRecruiterId = normalizeRecruiterId(recruiterId);
-
-  const jobs = await prisma.jobs.findMany({
-    where: {
+  const { page = 1, limit = 20, skip = 0, take = limit } = pagination;
+  const where = {
+    jobs: {
       recruiter_id: normalizedRecruiterId,
     },
-    select: {
-      id: true,
-    },
-  });
-
-  const jobIds = jobs.map((job) => job.id);
+  };
 
   console.log('[recruiter-applications] recruiter lookup', {
     recruiterId: String(normalizedRecruiterId),
-    jobIds: jobIds.map((jobId) => String(jobId)),
-    jobCount: jobIds.length,
   });
 
-  if (jobIds.length === 0) {
-    return [];
-  }
-
-  const applications = await prisma.job_applications.findMany({
-    where: {
-      job_id: {
-        in: jobIds,
+  const [applications, total] = await prisma.$transaction([
+    prisma.job_applications.findMany({
+      where,
+      orderBy: {
+        applied_at: 'desc',
       },
-    },
-    orderBy: {
-      applied_at: 'desc',
-    },
-    include: {
-      users: {
+      skip,
+      take,
+      include: {
+        users: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            contact_number: true,
+            current_location: true,
+            resume_file: true,
+          },
+        },
+        jobs: {
+          select: {
+            id: true,
+            recruiter_id: true,
+            title: true,
+            company: true,
+            location: true,
+            skills_required: true,
+            min_experience_years: true,
+            match_percentage: true,
+          },
+        },
+      },
+    }),
+    prisma.job_applications.count({ where }),
+  ]);
+
+  const detailFilters = applications.map((application) => ({
+    job_id: application.job_id,
+    user_id: application.user_id,
+  }));
+
+  const detailedApplications = detailFilters.length
+    ? await prisma.applications.findMany({
+        where: {
+          OR: detailFilters,
+        },
+        orderBy: {
+          applied_at: 'desc',
+        },
         select: {
           id: true,
+          job_id: true,
+          user_id: true,
           name: true,
           email: true,
-          contact_number: true,
-          current_location: true,
-          resume_file: true,
-        },
-      },
-      jobs: {
-        select: {
-          id: true,
-          recruiter_id: true,
-          title: true,
-          company: true,
+          phone: true,
           location: true,
-          skills_required: true,
-          min_experience_years: true,
-          match_percentage: true,
+          experience_level: true,
+          current_salary: true,
+          expected_salary: true,
+          notice_period: true,
+          additional_comments: true,
+          resume_path: true,
+          match_score: true,
+          matched_skills: true,
+          missing_skills: true,
+          match_status: true,
+          applied_at: true,
         },
-      },
-    },
-  });
-
-  const detailedApplications = await prisma.applications.findMany({
-    where: {
-      job_id: {
-        in: jobIds,
-      },
-    },
-    orderBy: {
-      applied_at: 'desc',
-    },
-    select: {
-      id: true,
-      job_id: true,
-      user_id: true,
-      name: true,
-      email: true,
-      phone: true,
-      location: true,
-      experience_level: true,
-      current_salary: true,
-      expected_salary: true,
-      notice_period: true,
-      additional_comments: true,
-      resume_path: true,
-      match_score: true,
-      matched_skills: true,
-      missing_skills: true,
-      match_status: true,
-      applied_at: true,
-    },
-  });
+      })
+    : [];
 
   const detailedApplicationMap = new Map();
   detailedApplications.forEach((application) => {
@@ -334,10 +330,15 @@ export const getRecruiterApplications = async (recruiterId) => {
     applicationIds: applications.map((application) => String(application.id)),
   });
 
-  return applications.map((application) => {
+  const normalizedApplications = applications.map((application) => {
     const detailKey = `${String(application.job_id)}:${String(application.user_id)}`;
     return normalizeApplicationRecord(application, detailedApplicationMap.get(detailKey) || null);
   });
+
+  return {
+    applications: normalizedApplications,
+    pagination: buildPagination({ page, limit: take, total }),
+  };
 };
 
 export const getRecruiterApplicationProfile = async (recruiterId, applicationId) => {
@@ -577,6 +578,7 @@ export const getCompanies = async () => {
     orderBy: {
       updated_at: 'desc',
     },
+    take: 100,
   });
 
   return dedupeCompanies(recruiters).map((recruiter) =>
@@ -614,6 +616,7 @@ export const getUserCompanyRatings = async (userId) => {
       company_id: true,
       rating: true,
     },
+    take: 100,
   });
 
   return ratings.map((rating) => ({

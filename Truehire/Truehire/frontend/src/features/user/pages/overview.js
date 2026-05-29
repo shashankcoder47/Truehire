@@ -2,7 +2,28 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import Link from 'next/link'
-import { Home, Search, Send } from 'lucide-react'
+import { motion } from 'framer-motion'
+import {
+  Bell,
+  Bookmark,
+  Briefcase,
+  CalendarDays,
+  ChevronRight,
+  ClipboardCheck,
+  FileText,
+  Home,
+  Inbox,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  MessageSquare,
+  Search,
+  Send,
+  Settings,
+  Sparkles,
+  User,
+  Zap,
+} from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
 import apiService from '../../../services/api'
 import FriendSuggestions from '../../../components/FriendSuggestions'
@@ -1818,7 +1839,7 @@ export default function Overview() {
 
     const refreshInterval = window.setInterval(() => {
       loadNotifications({ silent: true })
-    }, 5000)
+    }, 30000)
 
     return () => {
       window.clearInterval(clockInterval)
@@ -1983,6 +2004,15 @@ export default function Overview() {
     })
   }, [feedPosts, pulseJobs])
 
+  const companyUpdatePosts = useMemo(() => (
+    feedPosts.filter((post) => (
+      post?.post_type !== 'user' ||
+      post?.company_id ||
+      post?.company_name ||
+      post?.company_logo
+    ))
+  ), [feedPosts])
+
   const pulseFeedItems = useMemo(() => {
     const items = feedPosts.map((post) => ({
       key: `${post.post_type || 'company'}-${post.id}`,
@@ -2110,7 +2140,7 @@ export default function Overview() {
   const overviewStats = [
     {
       href: '/applications',
-      label: 'Applications',
+      label: 'Applied Jobs',
       value: String(applicationCount),
       description: 'Track your latest activity',
       eyebrow: 'Pipeline',
@@ -2136,10 +2166,10 @@ export default function Overview() {
     },
     {
       href: '/profile',
-      label: 'Profile Status',
-      value: profileCompletion,
-      description: 'Update your profile details',
-      eyebrow: 'Identity',
+      label: 'Skill Tests',
+      value: user?.skill_tests_completed || user?.skillTestsCompleted || '0',
+      description: 'Assessments completed',
+      eyebrow: 'Readiness',
       accent: 'from-[#312E81] via-[#6366F1] to-[#A5B4FC]',
       icon: (
         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -2148,10 +2178,10 @@ export default function Overview() {
       )
     },
     {
-      href: '/inbox',
-      label: 'Notifications',
+      href: '/job-alerts',
+      label: 'Job Alerts',
       value: unreadNotificationCount > 0 ? String(unreadNotificationCount) : '0',
-      description: 'Unread recruiter updates',
+      description: 'Fresh alerts waiting',
       eyebrow: 'Signals',
       accent: 'from-[#7C2D12] via-[#EA580C] to-[#FDBA74]',
       icon: (
@@ -2318,6 +2348,599 @@ export default function Overview() {
       <Head>
         <title>Overview - TrueHire</title>
       </Head>
+      <div className="min-h-screen bg-[#f7f9fd] text-slate-950">
+        <div className="flex">
+          <motion.aside
+            initial={{ x: -24, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ duration: 0.35 }}
+            className="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-slate-200/80 bg-white/90 px-4 py-5 shadow-[18px_0_55px_-48px_rgba(15,23,42,0.65)] backdrop-blur-xl lg:block"
+          >
+            <Link href="/overview" className="flex items-center gap-3 rounded-2xl px-3 py-2 no-underline hover:no-underline">
+              <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-lg shadow-blue-600/20">
+                <Sparkles className="h-5 w-5" />
+              </span>
+              <span>
+                <span className="block text-lg font-black tracking-tight text-slate-950">Truehire</span>
+                <span className="block text-xs font-semibold text-slate-500">Candidate workspace</span>
+              </span>
+            </Link>
+
+            <nav className="mt-8 space-y-1">
+              {[
+                { href: '/overview', label: 'Dashboard', icon: LayoutDashboard, active: true },
+                { href: '/jobs', label: 'Find Jobs', icon: Search },
+                { href: '/applications', label: 'Applications', icon: ClipboardCheck },
+                { href: '/saved-jobs', label: 'Saved Jobs', icon: Bookmark },
+                { href: '/messages', label: 'Messages', icon: MessageSquare },
+                { href: '/profile', label: 'Profile', icon: User },
+                { href: '/settings', label: 'Settings', icon: Settings },
+              ].map((item) => {
+                const Icon = item.icon
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold no-underline transition hover:no-underline ${
+                      item.active
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span>{item.label}</span>
+                  </Link>
+                )
+              })}
+            </nav>
+
+            <div className="absolute bottom-5 left-4 right-4 rounded-[22px] border border-slate-200 bg-white p-3 shadow-[0_18px_45px_-38px_rgba(15,23,42,0.65)]">
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white transition hover:-translate-y-0.5 hover:bg-rose-600"
+              >
+                <LogOut className="h-4 w-4" />
+                Logout
+              </button>
+            </div>
+          </motion.aside>
+
+          {showMenu && (
+            <div className="fixed inset-0 z-50 bg-slate-950/30 backdrop-blur-sm lg:hidden" onClick={() => setShowMenu(false)}>
+              <motion.aside
+                initial={{ x: -280 }}
+                animate={{ x: 0 }}
+                className="h-full w-80 max-w-[86vw] bg-white p-4 shadow-2xl"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-lg font-black">Truehire</span>
+                  <button type="button" onClick={() => setShowMenu(false)} className="rounded-full border border-slate-200 px-3 py-1 text-sm font-bold text-slate-600">Close</button>
+                </div>
+                <nav className="mt-6 space-y-2">
+                  {[
+                    ['/overview', 'Dashboard', LayoutDashboard],
+                    ['/jobs', 'Find Jobs', Search],
+                    ['/applications', 'Applications', ClipboardCheck],
+                    ['/saved-jobs', 'Saved Jobs', Bookmark],
+                    ['/messages', 'Messages', MessageSquare],
+                    ['/profile', 'Profile', User],
+                    ['/settings', 'Settings', Settings],
+                  ].map(([href, label, Icon]) => (
+                    <Link key={href} href={href} className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-slate-700 no-underline hover:bg-slate-100 hover:no-underline">
+                      <Icon className="h-5 w-5" />
+                      {label}
+                    </Link>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="flex w-full items-center gap-3 rounded-2xl border-0 bg-slate-950 px-3 py-3 text-sm font-bold text-white transition hover:bg-rose-600"
+                  >
+                    <LogOut className="h-5 w-5" />
+                    Logout
+                  </button>
+                </nav>
+              </motion.aside>
+            </div>
+          )}
+
+          <main className="min-w-0 flex-1 lg:pl-72">
+            <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/85 backdrop-blur-xl">
+              <div className="flex min-h-20 items-center gap-3 px-4 sm:px-6 lg:px-8">
+                <button
+                  ref={menuButtonRef}
+                  type="button"
+                  onClick={() => setShowMenu(true)}
+                  className="grid h-11 w-11 place-items-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm lg:hidden"
+                  aria-label="Open sidebar"
+                >
+                  <Menu className="h-5 w-5" />
+                </button>
+                <div className="hidden min-w-0 flex-1 items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 shadow-inner shadow-slate-200/50 md:flex">
+                  <Search className="h-5 w-5 shrink-0 text-slate-400" />
+                  <button type="button" onClick={() => router.push('/jobs')} className="min-w-0 flex-1 border-0 bg-transparent p-0 text-left text-sm font-semibold text-slate-500">
+                    Search jobs, companies, skills...
+                  </button>
+                </div>
+                <button
+                  ref={notificationsButtonRef}
+                  type="button"
+                  onClick={handleNotificationBellClick}
+                  className="relative grid h-11 w-11 place-items-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200"
+                  aria-label="Open notifications"
+                >
+                  <Bell className="h-5 w-5" />
+                  {unreadNotificationCount > 0 && (
+                    <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-blue-600 px-1 text-[10px] font-black text-white">
+                      {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push('/profile')}
+                  className="flex h-11 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-2 pr-4 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200"
+                >
+                  <span className="grid h-8 w-8 place-items-center overflow-hidden rounded-xl bg-slate-900 text-xs font-black text-white">
+                    {photoSrc ? <img src={photoSrc} alt="" className="h-full w-full object-cover" /> : String(displayName || 'U').slice(0, 1)}
+                  </span>
+                  <span className="hidden text-sm font-black text-slate-800 sm:block">{displayName.split(' ')[0]}</span>
+                </button>
+              </div>
+              <div
+                ref={notificationsPanelRef}
+                className={`absolute right-4 top-[72px] z-50 w-96 max-w-[calc(100vw-2rem)] overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-2xl shadow-slate-950/10 transition-all ${
+                  showNotifications ? 'pointer-events-auto translate-y-0 opacity-100' : 'pointer-events-none translate-y-3 opacity-0'
+                }`}
+              >
+                <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+                  <div>
+                    <p className="text-sm font-black text-slate-950">Notifications</p>
+                    <p className="text-xs font-semibold text-slate-500">Recruiter updates and requests</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleClearNotifications}
+                    disabled={clearingNotifications || notifications.length === 0}
+                    className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-40"
+                  >
+                    {clearingNotifications ? 'Saving' : 'Read all'}
+                  </button>
+                </div>
+                <div className="max-h-96 overflow-y-auto p-3">
+                  {notificationsLoading ? (
+                    <div className="py-10 text-center text-sm font-semibold text-slate-500">Loading notifications...</div>
+                  ) : notifications.length === 0 ? (
+                    <div className="rounded-2xl bg-slate-50 p-6 text-center text-sm font-semibold text-slate-500">No notifications yet.</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {notifications.slice(0, 8).map((notification) => (
+                        <button
+                          key={notification.id}
+                          type="button"
+                          onClick={() => handleNotificationNavigate(notification)}
+                          className="w-full rounded-2xl border border-slate-100 bg-white p-3 text-left transition hover:border-blue-100 hover:bg-blue-50/50"
+                        >
+                          <p className="line-clamp-2 text-sm font-bold text-slate-800">{notification.message || notification.metadata?.title || 'New update'}</p>
+                          <p className="mt-2 text-xs font-semibold text-slate-400">{formatTimeAgo(notification.createdAt) || 'Just now'}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </header>
+
+            <div className="space-y-8 px-4 py-6 sm:px-6 lg:px-8">
+              <motion.section
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.45 }}
+                className="overflow-hidden rounded-[30px] border border-white bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 p-6 text-white shadow-2xl shadow-blue-900/15 sm:p-8"
+              >
+                <div className="grid gap-6 lg:grid-cols-[1fr_320px] lg:items-center">
+                  <div>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-3 py-1.5 text-xs font-bold backdrop-blur">
+                      <Sparkles className="h-4 w-4" />
+                      Candidate dashboard
+                    </div>
+                    <h1 className="mt-5 max-w-2xl text-3xl font-black tracking-tight sm:text-4xl">Welcome back, {displayName.split(' ')[0] || 'there'}.</h1>
+                    <p className="mt-3 max-w-2xl text-sm leading-6 text-blue-50 sm:text-base">
+                      Track your job search, review recommendations, and keep your profile ready for recruiters.
+                    </p>
+                    <div className="mt-6 flex flex-wrap gap-3">
+                      <button type="button" onClick={() => router.push('/jobs')} className="rounded-2xl bg-white px-5 py-3 text-sm font-black text-blue-700 shadow-lg shadow-slate-950/10 transition hover:-translate-y-0.5">
+                        Explore jobs
+                      </button>
+                      <button type="button" onClick={handleManageProfile} className="rounded-2xl border border-white/25 bg-white/10 px-5 py-3 text-sm font-black text-white transition hover:-translate-y-0.5 hover:bg-white/20">
+                        Update profile
+                      </button>
+                    </div>
+                  </div>
+                  <div className="rounded-[26px] border border-white/15 bg-white/10 p-5 backdrop-blur">
+                    <div className="flex items-center gap-4">
+                      <span className="grid h-16 w-16 place-items-center overflow-hidden rounded-3xl bg-white text-lg font-black text-blue-700">
+                        {photoSrc ? <img src={photoSrc} alt="" className="h-full w-full object-cover" /> : String(displayName || 'U').slice(0, 1)}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-lg font-black">{displayName}</p>
+                        <p className="truncate text-sm text-blue-100">{currentRole}</p>
+                      </div>
+                    </div>
+                    <div className="mt-5 grid grid-cols-3 gap-2 text-center">
+                      <button type="button" onClick={() => openFollowList('following')} className="rounded-2xl bg-white/10 px-3 py-3 transition hover:bg-white/15">
+                        <span className="block text-lg font-black">{followingCount}</span>
+                        <span className="text-[11px] font-semibold text-blue-100">Following</span>
+                      </button>
+                      <button type="button" onClick={() => openFollowList('followers')} className="rounded-2xl bg-white/10 px-3 py-3 transition hover:bg-white/15">
+                        <span className="block text-lg font-black">{followersCount}</span>
+                        <span className="text-[11px] font-semibold text-blue-100">Followers</span>
+                      </button>
+                      <div className="rounded-2xl bg-white/10 px-3 py-3">
+                        <span className="block text-lg font-black">{applicationCount}</span>
+                        <span className="text-[11px] font-semibold text-blue-100">Applied</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.section>
+
+              <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {overviewStats.map((stat, index) => (
+                  <motion.div
+                    key={stat.label}
+                    initial={{ opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.35, delay: index * 0.05 }}
+                    whileHover={{ y: -4 }}
+                  >
+                    <Link href={stat.href} className="block h-full rounded-[24px] border border-slate-200 bg-white p-5 no-underline shadow-[0_18px_50px_-42px_rgba(15,23,42,0.7)] transition hover:border-blue-100 hover:shadow-[0_22px_55px_-38px_rgba(37,99,235,0.45)] hover:no-underline">
+                      <div className="flex items-start justify-between gap-4">
+                        <span className={`grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br ${stat.accent} text-white shadow-lg shadow-slate-950/10`}>
+                          {stat.icon}
+                        </span>
+                        <ChevronRight className="h-5 w-5 text-slate-300" />
+                      </div>
+                      <p className="mt-5 text-xs font-black uppercase tracking-[0.18em] text-slate-400">{stat.eyebrow}</p>
+                      <div className="mt-2 flex items-end justify-between gap-3">
+                        <div>
+                          <p className="text-3xl font-black text-slate-950">{stat.value}</p>
+                          <p className="mt-1 text-sm font-bold text-slate-700">{stat.label}</p>
+                        </div>
+                      </div>
+                      <p className="mt-3 text-sm leading-5 text-slate-500">{stat.description}</p>
+                    </Link>
+                  </motion.div>
+                ))}
+              </section>
+
+              <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+                <section className="space-y-6">
+                  <div className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_22px_60px_-46px_rgba(15,23,42,0.75)] sm:p-6">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">Recommended jobs</p>
+                        <h2 className="mt-1 text-xl font-black text-slate-950">Roles matched to your profile</h2>
+                      </div>
+                      <Link href="/jobs" className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 no-underline transition hover:border-blue-200 hover:bg-blue-50 hover:no-underline">
+                        View all
+                      </Link>
+                    </div>
+                    {recommendedJobsError && (
+                      <p className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+                        Some recommended jobs could not load.
+                      </p>
+                    )}
+                    <div className="mt-5 grid gap-4 md:grid-cols-2">
+                      {(recommendedJobs.length ? recommendedJobs : jobs).slice(0, 4).map((job, index) => (
+                        <motion.article
+                          key={job.id || index}
+                          whileHover={{ y: -4 }}
+                          className="rounded-[22px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-5 shadow-sm transition hover:border-blue-100"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-blue-50 text-blue-600">
+                              <Briefcase className="h-5 w-5" />
+                            </span>
+                            {job.recommendationScore != null && (
+                              <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-black text-violet-700">
+                                {job.recommendationScore}% match
+                              </span>
+                            )}
+                          </div>
+                          <h3 className="mt-4 line-clamp-2 text-base font-black text-slate-950">{job.title || 'Open role'}</h3>
+                          <p className="mt-1 truncate text-sm font-semibold text-slate-500">{job.company || 'Company'} • {job.location || 'Remote'}</p>
+                          <p className="mt-3 text-sm font-bold text-slate-700">{formatSalary(job)}</p>
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {normalizeSkillList(job.skills_required, job.requiredSkills).slice(0, 3).map((skill) => (
+                              <span key={skill} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{skill}</span>
+                            ))}
+                          </div>
+                          <Link href={`/jobs/${job.id}/apply`} className="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white no-underline transition hover:bg-blue-700 hover:no-underline">
+                            Apply now
+                          </Link>
+                        </motion.article>
+                      ))}
+                    </div>
+                    {recommendedJobsLoading && (
+                      <p className="mt-4 text-center text-sm font-semibold text-slate-500">Loading recommended jobs...</p>
+                    )}
+                  </div>
+
+                  <div className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_22px_60px_-46px_rgba(15,23,42,0.75)] sm:p-6">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-600">Company pulse</p>
+                        <h2 className="mt-1 text-xl font-black text-slate-950">Latest opportunities and updates</h2>
+                      </div>
+                      <button type="button" onClick={() => loadFeed({ reset: true })} className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 transition hover:border-violet-200 hover:bg-violet-50">
+                        Refresh
+                      </button>
+                    </div>
+                    <div className="mt-5 space-y-5">
+                      {standalonePulseJobs.length > 0 && renderPulseJobRail(standalonePulseJobs.slice(0, 8), 'Latest recruiter jobs')}
+                      {companyUpdatePosts.slice(0, 6).map((post) => {
+                        const postId = String(post.id)
+                        const mediaItems = getFeedPostMediaItems(post)
+                        const comments = commentsByPost[postId] || []
+                        const logoUrl = post.company_logo
+                          ? normalizeStatusMediaUrl(post.company_logo)
+                          : post.profile_photo
+                            ? normalizeStatusMediaUrl(post.profile_photo)
+                            : ''
+
+                        return (
+                          <motion.article
+                            key={`${post.post_type || 'company'}-${post.id}`}
+                            whileHover={{ y: -3 }}
+                            className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_18px_50px_-42px_rgba(15,23,42,0.7)]"
+                          >
+                            <div className="flex items-start gap-3 p-5">
+                              <button
+                                type="button"
+                                onClick={() => post.company_id && router.push(getCompanyManagePostsHref(post.company_id))}
+                                className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 text-sm font-black text-slate-700 transition hover:border-blue-200"
+                                aria-label={`Open ${post.company_name || 'company'} updates`}
+                              >
+                                {logoUrl ? (
+                                  <img src={logoUrl} alt="" className="h-full w-full object-cover" />
+                                ) : (
+                                  String(post.company_name || post.user_name || 'T').slice(0, 1)
+                                )}
+                              </button>
+                              <div className="min-w-0 flex-1">
+                                <button
+                                  type="button"
+                                  onClick={() => post.company_id && router.push(getCompanyManagePostsHref(post.company_id))}
+                                  className="block max-w-full appearance-none truncate border-0 bg-transparent p-0 text-left text-sm font-black text-slate-950 transition hover:text-blue-700"
+                                >
+                                  {post.company_name || post.user_name || 'Company update'}
+                                </button>
+                                <p className="mt-1 text-xs font-semibold text-slate-500">{formatTimeAgo(post.created_at) || 'Just now'}</p>
+                              </div>
+                              {post.company_id && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleFollowCompany(post)}
+                                  disabled={feedActionId === `follow-${post.id}`}
+                                  className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-700 transition hover:bg-blue-100 disabled:opacity-60"
+                                >
+                                  {post.following ? 'Following' : 'Follow'}
+                                </button>
+                              )}
+                            </div>
+
+                            {(post.caption || post.description) && (
+                              <p className="px-5 pb-4 text-sm leading-6 text-slate-700">
+                                {post.caption || post.description}
+                              </p>
+                            )}
+
+                            {mediaItems.length > 0 && (
+                              <div className="border-y border-slate-100 bg-slate-50">
+                                {mediaItems.length === 1 ? (
+                                  mediaItems[0].type === 'video' ? (
+                                    <video
+                                      src={mediaItems[0].url}
+                                      className="max-h-[520px] w-full cursor-pointer object-contain"
+                                      muted
+                                      playsInline
+                                      preload="metadata"
+                                      onPlay={() => handleVideoPostPlay(post)}
+                                      onClick={(event) => handleFeedVideoClick(event, post)}
+                                    />
+                                  ) : (
+                                    <img
+                                      src={mediaItems[0].url}
+                                      alt=""
+                                      className="max-h-[520px] w-full cursor-pointer object-contain"
+                                      onClick={() => registerFeedMediaTap(post)}
+                                    />
+                                  )
+                                ) : (
+                                  <div className="flex snap-x gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                    {mediaItems.map((item, index) => (
+                                      <div key={`${item.url}-${index}`} className="relative h-[360px] min-w-full snap-center bg-slate-50">
+                                        {item.type === 'video' ? (
+                                          <video
+                                            src={item.url}
+                                            className="h-full w-full cursor-pointer object-contain"
+                                            muted
+                                            playsInline
+                                            preload="metadata"
+                                            onPlay={() => handleVideoPostPlay(post)}
+                                            onClick={(event) => handleFeedVideoClick(event, post)}
+                                          />
+                                        ) : (
+                                          <img
+                                            src={item.url}
+                                            alt=""
+                                            className="h-full w-full cursor-pointer object-contain"
+                                            onClick={() => registerFeedMediaTap(post)}
+                                          />
+                                        )}
+                                        <span className="absolute right-3 top-3 rounded-full bg-slate-950/75 px-3 py-1 text-xs font-bold text-white">
+                                          {index + 1}/{mediaItems.length}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            <div className="flex items-center gap-5 px-5 py-4 text-sm font-bold text-slate-700">
+                              <button
+                                type="button"
+                                disabled={feedActionId === post.id}
+                                onClick={() => handleLikePost(post)}
+                                className={`inline-flex items-center gap-2 border-0 bg-transparent p-0 transition hover:text-blue-700 disabled:opacity-60 ${post.liked ? 'text-blue-700' : ''}`}
+                              >
+                                <span>{post.liked ? 'Liked' : 'Like'}</span>
+                                <span>{post.like_count || 0}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleComments(post)}
+                                className={`inline-flex items-center gap-2 border-0 bg-transparent p-0 transition hover:text-blue-700 ${openCommentPostId === post.id ? 'text-blue-700' : ''}`}
+                              >
+                                <span>Comments</span>
+                                <span>{post.comment_count || 0}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSharePost(post)}
+                                className="border-0 bg-transparent p-0 transition hover:text-blue-700"
+                              >
+                                Share
+                              </button>
+                            </div>
+
+                            {openCommentPostId === post.id && (
+                              <div className="border-t border-slate-100 bg-slate-50 p-4">
+                                {commentsLoadingId === post.id ? (
+                                  <p className="text-sm font-semibold text-slate-500">Loading comments...</p>
+                                ) : comments.length > 0 ? (
+                                  <div className="space-y-3">
+                                    {comments.slice(0, 4).map((comment) => (
+                                      <div key={comment.id || `${comment.created_at}-${comment.comment}`} className="rounded-2xl bg-white px-4 py-3">
+                                        <p className="text-sm font-black text-slate-900">{comment.user_name || 'TrueHire user'}</p>
+                                        <p className="mt-1 text-sm leading-5 text-slate-600">{comment.comment}</p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-sm font-semibold text-slate-500">No comments yet.</p>
+                                )}
+                                <div className="mt-4 flex gap-2">
+                                  <input
+                                    value={commentDrafts[postId] || ''}
+                                    onChange={(event) => setCommentDrafts((current) => ({ ...current, [postId]: event.target.value }))}
+                                    onKeyDown={(event) => {
+                                      if (event.key === 'Enter') handleAddComment(post)
+                                    }}
+                                    placeholder="Write a comment..."
+                                    className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-950 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAddComment(post)}
+                                    disabled={feedActionId === `comment-${postId}` || !String(commentDrafts[postId] || '').trim()}
+                                    className="rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-black text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    Post
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </motion.article>
+                        )
+                      })}
+                      {companyUpdatePosts.length === 0 && standalonePulseJobs.length === 0 && !feedLoading && (
+                        <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
+                          <p className="text-sm font-bold text-slate-500">No company updates yet. New recruiter jobs and posts will appear here.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </section>
+
+                <aside className="space-y-6">
+                  <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_22px_60px_-46px_rgba(15,23,42,0.75)]">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-lg font-black text-slate-950">Applications</h2>
+                      <FileText className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div className="mt-5 space-y-3">
+                      {[
+                        ['Total applied', applicationCount, '/applications'],
+                        ['Saved roles', savedJobCount, '/saved-jobs'],
+                        ['Unread updates', unreadNotificationCount, '/notifications'],
+                      ].map(([label, value, href]) => (
+                        <Link key={label} href={href} className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 no-underline transition hover:bg-blue-50 hover:no-underline">
+                          <span className="text-sm font-bold text-slate-700">{label}</span>
+                          <span className="text-sm font-black text-slate-950">{value}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_22px_60px_-46px_rgba(15,23,42,0.75)]">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-lg font-black text-slate-950">Upcoming Interviews</h2>
+                      <CalendarDays className="h-5 w-5 text-violet-600" />
+                    </div>
+                    <div className="mt-5 rounded-2xl bg-violet-50 p-4">
+                      <p className="text-sm font-black text-violet-900">No interviews scheduled</p>
+                      <p className="mt-1 text-sm leading-6 text-violet-700">When recruiters schedule interviews, they will appear here.</p>
+                    </div>
+                  </section>
+
+                  <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_22px_60px_-46px_rgba(15,23,42,0.75)]">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-lg font-black text-slate-950">Quick Actions</h2>
+                      <Zap className="h-5 w-5 text-amber-500" />
+                    </div>
+                    <div className="mt-5 grid gap-3">
+                      {quickActionCards.map((action) => (
+                        <Link key={action.href} href={action.href} className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 no-underline transition hover:-translate-y-0.5 hover:border-blue-100 hover:bg-blue-50/50 hover:no-underline">
+                          <span className={`grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br ${action.accent} text-xs font-black text-white`}>
+                            {action.badge}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-black text-slate-950">{action.title}</span>
+                            <span className="line-clamp-1 text-xs font-semibold text-slate-500">{action.description}</span>
+                          </span>
+                          <ChevronRight className="h-4 w-4 text-slate-300 transition group-hover:text-blue-500" />
+                        </Link>
+                      ))}
+                    </div>
+                  </section>
+                </aside>
+              </div>
+
+            </div>
+          </main>
+        </div>
+      </div>
+      <nav className="fixed inset-x-0 bottom-0 z-40 flex h-16 items-center justify-around border-t border-slate-200 bg-white/95 px-5 text-slate-700 shadow-[0_-18px_50px_-42px_rgba(15,23,42,0.7)] backdrop-blur md:hidden">
+        <button type="button" onClick={() => router.push('/overview')} className="appearance-none border-0 bg-transparent p-0 text-blue-600" aria-label="Home">
+          <Home className="h-6 w-6" strokeWidth={2.5} />
+        </button>
+        <button type="button" onClick={() => router.push('/messages')} className="appearance-none border-0 bg-transparent p-0" aria-label="Messages">
+          <Send className="h-6 w-6" strokeWidth={2.5} />
+        </button>
+        <button type="button" onClick={() => router.push('/jobs')} className="appearance-none border-0 bg-transparent p-0" aria-label="Search">
+          <Search className="h-6 w-6" strokeWidth={2.5} />
+        </button>
+        <button type="button" onClick={() => router.push('/profile')} className="flex h-8 w-8 appearance-none items-center justify-center overflow-hidden rounded-xl bg-slate-900 p-0 text-xs font-black text-white" aria-label="Profile">
+          {photoSrc ? <img src={photoSrc} alt="" className="h-full w-full object-cover" /> : String(displayName || 'U').slice(0, 1)}
+        </button>
+      </nav>
+      {false && (
+      <>
       <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.2),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(45,212,191,0.18),_transparent_24%),linear-gradient(160deg,#fffdf7_0%,#f8fbff_46%,#eef6ff_100%)] text-slate-900">
         <div className="fixed left-4 top-4 z-50">
           <button
@@ -3933,6 +4556,8 @@ export default function Overview() {
           {photoSrc ? <img src={photoSrc} alt="" className="h-full w-full object-cover" /> : String(displayName || 'U').slice(0, 1)}
         </button>
       </nav>
+      </>
+      )}
       {shareTargetPost && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 py-6"

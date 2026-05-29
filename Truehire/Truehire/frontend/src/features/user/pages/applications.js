@@ -48,7 +48,7 @@ export default function Applications() {
     }, 1000)
     const refreshInterval = window.setInterval(() => {
       fetchNotifications({ silent: true })
-    }, 5000)
+    }, 30000)
 
     return () => {
       window.clearInterval(clockInterval)

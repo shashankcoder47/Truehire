@@ -82,10 +82,13 @@ model application_messages {
   jobs                            jobs                                 @relation(fields: [job_id], references: [id], onDelete: Cascade, map: "fk_app_messages_job")
 
   @@index([application_id], map: "idx_app_messages_application")
+  @@index([application_id, created_at, id], map: "idx_app_messages_application_created")
   @@index([conversation_id], map: "idx_app_messages_conversation")
+  @@index([conversation_id, created_at, id], map: "idx_app_messages_conversation_created")
   @@index([job_id], map: "idx_app_messages_job")
   @@index([read_status], map: "idx_app_messages_read")
   @@index([receiver_id], map: "idx_app_messages_receiver")
+  @@index([receiver_id, receiver_role, read_status], map: "idx_app_messages_receiver_unread")
   @@index([sender_id], map: "idx_app_messages_sender")
 }
 
@@ -275,8 +278,10 @@ model job_applications {
   users                      users                       @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "fk_job_applications_user")
 
   @@unique([job_id, user_id], map: "unique_job_user")
+  @@index([job_id, applied_at], map: "idx_job_applications_job_applied")
   @@index([job_id], map: "idx_job_applications_job")
   @@index([status], map: "idx_job_applications_status")
+  @@index([user_id, applied_at], map: "idx_job_applications_user_applied")
   @@index([user_id], map: "idx_job_applications_user")
 }
 
@@ -318,7 +323,9 @@ model jobs {
   saved_jobs                    saved_jobs[]
 
   @@index([location], map: "idx_jobs_location")
+  @@index([recruiter_id, created_at], map: "idx_jobs_recruiter_created")
   @@index([recruiter_id], map: "idx_jobs_recruiter")
+  @@index([status, created_at], map: "idx_jobs_status_created")
   @@index([status], map: "idx_jobs_status")
 }
 
@@ -346,6 +353,7 @@ model notifications {
 
   @@index([recipient_type], map: "idx_notifications_recipient_type")
   @@index([sent_at], map: "idx_notifications_sent_at")
+  @@index([status, created_at], map: "idx_notifications_status_created")
   @@index([status], map: "idx_notifications_status")
   @@index([type], map: "idx_notifications_type")
 }
@@ -674,6 +682,8 @@ model user_notifications {
 
   @@index([application_id], map: "idx_user_notifications_application")
   @@index([status], map: "idx_user_notifications_status")
+  @@index([user_id, created_at], map: "idx_user_notifications_user_created")
+  @@index([user_id, status, created_at], map: "idx_user_notifications_user_status_created")
   @@index([user_id], map: "idx_user_notifications_user")
 }
 
@@ -809,6 +819,7 @@ model user_direct_messages {
   created_at  DateTime? @default(now()) @db.Timestamp(0)
 
   @@index([created_at], map: "idx_udm_created_at")
+  @@index([sender_id, receiver_id, created_at], map: "idx_udm_pair_created")
   @@index([sender_id, receiver_id], map: "idx_udm_pair")
   @@index([receiver_id], map: "idx_udm_receiver")
   @@index([sender_id], map: "idx_udm_sender")

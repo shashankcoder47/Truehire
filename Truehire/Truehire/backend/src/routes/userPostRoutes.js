@@ -15,6 +15,7 @@ import {
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/apiError.js';
 import { uploadArray, uploadMimeTypes } from '../utils/upload.js';
+import { getPagination } from '../utils/pagination.js';
 
 const router = Router();
 
@@ -71,18 +72,21 @@ router.get(
   authenticate,
   userOnly,
   asyncHandler(async (req, res) => {
-    const limit = Number(req.query.limit || 8);
-    const offset = Number(req.query.offset || 0);
-    const posts = await listFollowedUserPosts({
+    const pagination = getPagination(req.query);
+    const offset = Number(req.query.offset ?? pagination.offset);
+    const result = await listFollowedUserPosts({
       userId: req.auth.sub,
-      limit,
+      limit: pagination.limit,
       offset,
+      page: pagination.page,
     });
     res.json({
       success: true,
-      posts,
-      nextOffset: offset + posts.length,
-      hasMore: posts.length === Math.min(Math.max(limit || 8, 1), 20),
+      posts: result.posts,
+      data: result.posts,
+      pagination: result.pagination,
+      nextOffset: offset + result.posts.length,
+      hasMore: result.posts.length === pagination.limit,
     });
   }),
 );
@@ -92,12 +96,18 @@ router.get(
   authenticate,
   userOnly,
   asyncHandler(async (req, res) => {
-    const posts = await listUserPosts({
+    const result = await listUserPosts({
       userId: req.query.userId || req.auth.sub,
       viewerId: req.auth.sub,
       type: req.query.type || 'all',
+      pagination: getPagination(req.query),
     });
-    res.json({ success: true, posts });
+    res.json({
+      success: true,
+      posts: result.posts,
+      data: result.posts,
+      pagination: result.pagination,
+    });
   }),
 );
 
@@ -151,8 +161,13 @@ router.get(
   authenticate,
   userOnly,
   asyncHandler(async (req, res) => {
-    const comments = await getUserPostComments(req.params.id);
-    res.json({ success: true, comments });
+    const result = await getUserPostComments(req.params.id, getPagination(req.query));
+    res.json({
+      success: true,
+      comments: result.comments,
+      data: result.comments,
+      pagination: result.pagination,
+    });
   }),
 );
 

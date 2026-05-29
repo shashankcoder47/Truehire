@@ -18,6 +18,7 @@ import {
 import { createNewJobPostedNotifications } from '../services/notificationService.js';
 import { uploadMimeTypes, uploadSingle } from '../utils/upload.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { buildPagination, getPagination } from '../utils/pagination.js';
 import {
   applyJobSchema,
   createJobSchema,
@@ -77,12 +78,13 @@ router.get(
   authenticate,
   recruiterOnly,
   asyncHandler(async (req, res) => {
-    const jobs = await getRecruiterJobs(req.auth.sub);
+    const result = await getRecruiterJobs(req.auth.sub, getPagination(req.query));
 
     res.json({
       success: true,
-      jobs,
-      data: jobs,
+      jobs: result.jobs,
+      data: result.jobs,
+      pagination: result.pagination,
     });
   }),
 );
@@ -92,12 +94,13 @@ router.get(
   authenticate,
   userOnly,
   asyncHandler(async (req, res) => {
-    const jobs = await getRecommendedJobsForUser(req.auth.sub);
+    const result = await getRecommendedJobsForUser(req.auth.sub, getPagination(req.query));
 
     res.json({
       success: true,
-      jobs,
-      data: jobs,
+      jobs: result.jobs,
+      data: result.jobs,
+      pagination: result.pagination,
     });
   }),
 );
@@ -107,42 +110,49 @@ router.get(
   authenticate,
   userOnly,
   asyncHandler(async (req, res) => {
-    const applications = await prisma.job_applications.findMany({
-      where: {
-        user_id: BigInt(req.auth.sub),
-      },
-      orderBy: {
-        applied_at: 'desc',
-      },
-      select: {
-        id: true,
-        job_id: true,
-        status: true,
-        applied_at: true,
-        total_view_seconds: true,
-        introduction_videos: {
-          select: {
-            id: true,
-            uploaded_at: true,
-          },
-          orderBy: {
-            uploaded_at: 'desc',
-          },
-          take: 1,
+    const pagination = getPagination(req.query);
+    const where = {
+      user_id: BigInt(req.auth.sub),
+    };
+    const [applications, total] = await prisma.$transaction([
+      prisma.job_applications.findMany({
+        where,
+        orderBy: {
+          applied_at: 'desc',
         },
-        jobs: {
-          select: {
-            id: true,
-            title: true,
-            company: true,
-            location: true,
-            salary_min: true,
-            salary_max: true,
-            salary_currency: true,
+        skip: pagination.skip,
+        take: pagination.take,
+        select: {
+          id: true,
+          job_id: true,
+          status: true,
+          applied_at: true,
+          total_view_seconds: true,
+          introduction_videos: {
+            select: {
+              id: true,
+              uploaded_at: true,
+            },
+            orderBy: {
+              uploaded_at: 'desc',
+            },
+            take: 1,
+          },
+          jobs: {
+            select: {
+              id: true,
+              title: true,
+              company: true,
+              location: true,
+              salary_min: true,
+              salary_max: true,
+              salary_currency: true,
+            },
           },
         },
-      },
-    });
+      }),
+      prisma.job_applications.count({ where }),
+    ]);
 
     const normalizedApplications = applications.map((application) => {
       const job = application.jobs;
@@ -172,6 +182,12 @@ router.get(
     res.json({
       success: true,
       applications: normalizedApplications,
+      data: normalizedApplications,
+      pagination: buildPagination({
+        page: pagination.page,
+        limit: pagination.limit,
+        total,
+      }),
     });
   }),
 );

@@ -25,6 +25,7 @@ import {
   updateCompanySchema,
 } from '../validators/recruiterValidators.js';
 import { ApiError } from '../utils/apiError.js';
+import { getPagination } from '../utils/pagination.js';
 import { comparePassword, hashPassword } from '../utils/password.js';
 import { uploadMimeTypes, uploadSingle } from '../utils/upload.js';
 
@@ -272,12 +273,13 @@ router.get(
       subRecruiterId: req.auth.subRecruiterId ?? null,
     });
 
-    const applications = await getRecruiterApplications(req.auth.sub);
+    const result = await getRecruiterApplications(req.auth.sub, getPagination(req.query));
 
     res.json({
       success: true,
-      applications,
-      data: applications,
+      applications: result.applications,
+      data: result.applications,
+      pagination: result.pagination,
     });
   }),
 );

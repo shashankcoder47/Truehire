@@ -241,7 +241,7 @@ export default function DirectConversationPage() {
     if (!conversationId || !user) return
     const intervalId = window.setInterval(() => {
       loadConversation({ showLoading: false })
-    }, 5000)
+    }, 30000)
     return () => window.clearInterval(intervalId)
   }, [conversationId, user])
 

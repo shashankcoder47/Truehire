@@ -1,6 +1,7 @@
 import { pool } from '../config/database.js';
 import { ensureCompanyFollowersTable } from './companyFollowService.js';
 import { hasEmailConfig, sendFollowedCompanyJobEmail } from '../utils/email.js';
+import { buildPagination } from '../utils/pagination.js';
 
 const statusCache = {
   loadedAt: 0,
@@ -83,7 +84,9 @@ export const ensureUserNotificationsTable = async () => {
       updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_user_notifications_user_id (user_id),
       INDEX idx_user_notifications_application_id (application_id),
-      INDEX idx_user_notifications_status (status)
+      INDEX idx_user_notifications_status (status),
+      INDEX idx_user_notifications_user_created (user_id, created_at),
+      INDEX idx_user_notifications_user_status_created (user_id, status, created_at)
     )
   `);
 };
@@ -168,25 +171,30 @@ export const createNewJobPostedNotifications = async (job) => {
   let emailFailed = 0;
 
   if (hasEmailConfig && recipientRows.length > 0) {
-    const emailResults = await Promise.allSettled(
-      recipientRows.map((user) =>
-        sendFollowedCompanyJobEmail({
-          to: user.email,
-          name: user.name,
-          job: {
-            ...job,
-            id: jobId,
-            companyId,
-            title,
-            company,
-            location,
-          },
-        }),
-      ),
-    );
+    const batchSize = 50;
+    for (let index = 0; index < recipientRows.length; index += batchSize) {
+      const batch = recipientRows.slice(index, index + batchSize);
+      const emailResults = await Promise.allSettled(
+        batch.map((user) =>
+          sendFollowedCompanyJobEmail({
+            to: user.email,
+            name: user.name,
+            job: {
+              ...job,
+              id: jobId,
+              companyId,
+              title,
+              company,
+              location,
+            },
+          }),
+        ),
+      );
 
-    emailed = emailResults.filter((item) => item.status === 'fulfilled').length;
-    emailFailed = emailResults.length - emailed;
+      const batchEmailed = emailResults.filter((item) => item.status === 'fulfilled').length;
+      emailed += batchEmailed;
+      emailFailed += emailResults.length - batchEmailed;
+    }
 
     if (emailFailed > 0) {
       console.error('Some followed-company job emails failed:', {
@@ -211,19 +219,36 @@ export const createNewJobPostedNotifications = async (job) => {
   };
 };
 
-export const getNotificationsForUser = async (userId) => {
+export const getNotificationsForUser = async (userId, pagination = {}) => {
   await ensureUserNotificationsTable();
+  const page = Number(pagination.page || 1);
+  const limit = Number(pagination.limit || 20);
+  const offset = Number(pagination.offset ?? pagination.skip ?? 0);
 
-  const [rows] = await pool.execute(
-    `SELECT id, user_id, application_id, message, metadata, status, created_at, updated_at
-     FROM user_notifications
-     WHERE user_id = ?
-     ORDER BY created_at DESC
-     LIMIT 100`,
-    [databaseId(userId)],
-  );
+  const [[rows], [countRows]] = await Promise.all([
+    pool.execute(
+      `SELECT id, user_id, application_id, message, metadata, status, created_at, updated_at
+       FROM user_notifications
+       WHERE user_id = ?
+       ORDER BY created_at DESC, id DESC
+       LIMIT ? OFFSET ?`,
+      [databaseId(userId), limit, offset],
+    ),
+    pool.execute(
+      'SELECT COUNT(*) AS total FROM user_notifications WHERE user_id = ?',
+      [databaseId(userId)],
+    ),
+  ]);
 
-  return rows.map(normalizeNotification);
+  const notifications = rows.map(normalizeNotification);
+  return {
+    notifications,
+    pagination: buildPagination({
+      page,
+      limit,
+      total: Number(countRows?.[0]?.total || 0),
+    }),
+  };
 };
 
 export const countUnreadNotificationsForUser = async (userId) => {

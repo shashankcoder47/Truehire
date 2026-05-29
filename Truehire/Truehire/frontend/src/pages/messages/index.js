@@ -232,7 +232,7 @@ export default function DirectMessagesPage() {
         return
       }
       loadConversations({ showLoading: false })
-    }, 5000)
+    }, 30000)
     return () => window.clearInterval(intervalId)
   }, [selectedId, user]) // eslint-disable-line react-hooks/exhaustive-deps
 
