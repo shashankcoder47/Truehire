@@ -8,20 +8,103 @@ import { env } from '../config/env.js';
 import s3 from '../config/s3.js';
 import { ApiError } from './apiError.js';
 
-const allowedMimeTypes = new Set([
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'image/jpeg',
-  'image/jpg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-  'image/svg+xml',
-  'video/mp4',
-  'video/webm',
-  'video/quicktime',
+export const uploadMimeTypes = {
+  documents: [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  ],
+  images: [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/webp',
+    'image/gif',
+  ],
+  videos: [
+    'video/mp4',
+    'video/webm',
+    'video/quicktime',
+  ],
+};
+
+uploadMimeTypes.media = [
+  ...uploadMimeTypes.images,
+  ...uploadMimeTypes.videos,
+];
+
+uploadMimeTypes.all = [
+  ...uploadMimeTypes.documents,
+  ...uploadMimeTypes.media,
+];
+
+const mimeTypeExtensions = new Map([
+  ['application/pdf', new Set(['.pdf'])],
+  ['application/msword', new Set(['.doc'])],
+  ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', new Set(['.docx'])],
+  ['image/jpeg', new Set(['.jpg', '.jpeg'])],
+  ['image/jpg', new Set(['.jpg', '.jpeg'])],
+  ['image/png', new Set(['.png'])],
+  ['image/webp', new Set(['.webp'])],
+  ['image/gif', new Set(['.gif'])],
+  ['video/mp4', new Set(['.mp4'])],
+  ['video/webm', new Set(['.webm'])],
+  ['video/quicktime', new Set(['.mov', '.qt'])],
 ]);
+
+const allowedMimeTypes = new Set(uploadMimeTypes.all);
+const storage = multer.memoryStorage();
+const s3Client = env.awsS3Bucket ? s3 : null;
+
+const normalizeAllowedMimeTypes = (mimeTypes = allowedMimeTypes) => (
+  mimeTypes instanceof Set ? mimeTypes : new Set(mimeTypes)
+);
+
+const hasBytes = (buffer, bytes, offset = 0) => bytes.every((byte, index) => buffer[offset + index] === byte);
+const asciiAt = (buffer, start, end) => buffer.subarray(start, end).toString('ascii');
+
+const fileSignatureChecks = new Map([
+  ['application/pdf', (buffer) => asciiAt(buffer, 0, 5) === '%PDF-'],
+  ['application/msword', (buffer) => hasBytes(buffer, [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])],
+  ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', (buffer) => hasBytes(buffer, [0x50, 0x4b, 0x03, 0x04])],
+  ['image/jpeg', (buffer) => hasBytes(buffer, [0xff, 0xd8, 0xff])],
+  ['image/jpg', (buffer) => hasBytes(buffer, [0xff, 0xd8, 0xff])],
+  ['image/png', (buffer) => hasBytes(buffer, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])],
+  ['image/webp', (buffer) => asciiAt(buffer, 0, 4) === 'RIFF' && asciiAt(buffer, 8, 12) === 'WEBP'],
+  ['image/gif', (buffer) => ['GIF87a', 'GIF89a'].includes(asciiAt(buffer, 0, 6))],
+  ['video/mp4', (buffer) => asciiAt(buffer, 4, 8) === 'ftyp'],
+  ['video/quicktime', (buffer) => asciiAt(buffer, 4, 8) === 'ftyp'],
+  ['video/webm', (buffer) => hasBytes(buffer, [0x1a, 0x45, 0xdf, 0xa3])],
+]);
+
+const validateFileType = (file, allowedTypes = allowedMimeTypes) => {
+  if (!file) return;
+
+  const acceptedTypes = normalizeAllowedMimeTypes(allowedTypes);
+  if (!acceptedTypes.has(file.mimetype)) {
+    throw new ApiError(400, 'File type is not allowed');
+  }
+
+  const extension = path.extname(file.originalname || '').toLowerCase();
+  const validExtensions = mimeTypeExtensions.get(file.mimetype);
+
+  if (!extension || !validExtensions?.has(extension)) {
+    throw new ApiError(400, 'File extension does not match the uploaded file type');
+  }
+};
+
+const validateFileContents = (file, allowedTypes = allowedMimeTypes) => {
+  validateFileType(file, allowedTypes);
+
+  if (!Buffer.isBuffer(file.buffer) || file.buffer.length === 0) {
+    throw new ApiError(400, 'Uploaded file is empty or invalid');
+  }
+
+  const signatureCheck = fileSignatureChecks.get(file.mimetype);
+  if (signatureCheck && !signatureCheck(file.buffer)) {
+    throw new ApiError(400, 'Uploaded file content does not match its declared file type');
+  }
+};
 
 export const ensureUploadsDirectory = () => {
   if (env.awsS3Bucket) {
@@ -33,10 +116,6 @@ export const ensureUploadsDirectory = () => {
   }
 };
 
-const storage = multer.memoryStorage();
-
-const s3Client = env.awsS3Bucket ? s3 : null;
-
 const getPublicS3Url = (key) => {
   const encodedKey = key.split('/').map(encodeURIComponent).join('/');
   const baseUrl =
@@ -47,7 +126,7 @@ const getPublicS3Url = (key) => {
 };
 
 const getUploadFileName = (file) => {
-  const extension = path.extname(file.originalname || '');
+  const extension = path.extname(file.originalname || '').toLowerCase();
   return `${Date.now()}-${crypto.randomUUID()}${extension}`;
 };
 
@@ -92,8 +171,10 @@ const persistFile = async (file, folder = '') => {
   };
 };
 
-export const persistUploadedFile = async (file, folder = '') => {
+export const persistUploadedFile = async (file, folder = '', options = {}) => {
   if (!file) return null;
+
+  validateFileContents(file, options.allowedMimeTypes);
 
   const stored = await persistFile(file, folder);
   file.filename = stored.filename;
@@ -108,9 +189,9 @@ export const persistUploadedFile = async (file, folder = '') => {
   return file;
 };
 
-export const persistUploadedFiles = async (files, folder = '') => {
+export const persistUploadedFiles = async (files, folder = '', options = {}) => {
   if (!Array.isArray(files)) return [];
-  return Promise.all(files.map((file) => persistUploadedFile(file, folder)));
+  return Promise.all(files.map((file) => persistUploadedFile(file, folder, options)));
 };
 
 export const deleteUploadedFile = async (file) => {
@@ -131,29 +212,32 @@ export const deleteUploadedFile = async (file) => {
   }
 };
 
-const fileFilter = (_req, file, callback) => {
-  if (!allowedMimeTypes.has(file.mimetype)) {
-    callback(new ApiError(400, 'Only PDF, DOC, DOCX, JPG, JPEG, PNG, WEBP, GIF, SVG, MP4, WEBM, and MOV files are allowed'));
-    return;
+const createFileFilter = (allowedTypes) => (_req, file, callback) => {
+  try {
+    validateFileType(file, allowedTypes);
+    callback(null, true);
+  } catch (error) {
+    callback(error);
   }
-
-  callback(null, true);
 };
 
-const upload = multer({
+const createUpload = ({
+  allowedMimeTypes: routeAllowedMimeTypes = allowedMimeTypes,
+  maxFileSize = 100 * 1024 * 1024,
+} = {}) => multer({
   storage,
   limits: {
-    fileSize: 100 * 1024 * 1024,
+    fileSize: maxFileSize,
   },
-  fileFilter,
+  fileFilter: createFileFilter(routeAllowedMimeTypes),
 });
 
-export const uploadSingle = (fieldName, folder = '') => [
-  upload.single(fieldName),
+export const uploadSingle = (fieldName, folder = '', options = {}) => [
+  createUpload(options).single(fieldName),
   async (req, _res, next) => {
     try {
       if (req.file) {
-        await persistUploadedFile(req.file, folder);
+        await persistUploadedFile(req.file, folder, options);
       }
 
       next();
@@ -163,8 +247,8 @@ export const uploadSingle = (fieldName, folder = '') => [
   },
 ];
 
-export const uploadArray = (fieldName, maxCount, folder = '') => [
-  Array.isArray(fieldName) ? upload.fields(fieldName) : upload.array(fieldName, maxCount),
+export const uploadArray = (fieldName, maxCount, folder = '', options = {}) => [
+  Array.isArray(fieldName) ? createUpload(options).fields(fieldName) : createUpload(options).array(fieldName, maxCount),
   async (req, _res, next) => {
     try {
       const files = Array.isArray(req.files)
@@ -172,7 +256,7 @@ export const uploadArray = (fieldName, maxCount, folder = '') => [
         : Object.values(req.files || {}).flat();
 
       if (files.length) {
-        await persistUploadedFiles(files, folder);
+        await persistUploadedFiles(files, folder, options);
       }
 
       next();

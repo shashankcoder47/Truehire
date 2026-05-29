@@ -12,8 +12,8 @@ terraform plan
 terraform apply
 ```
 
-This creates EC2, RDS MySQL, S3, an EC2 IAM role for S3 uploads, and security groups.
-The S3 template allows public read for uploaded objects because the current app stores direct file URLs. For private resumes/documents, add signed download routes before disabling public reads.
+This creates EC2, private RDS MySQL, encrypted S3 uploads, an EC2 IAM role for S3 uploads, and security groups.
+The S3 template keeps public read enabled by default because the current app stores direct file URLs. After adding signed download routes, set `uploads_public_read = false`.
 
 ## 2. Prepare EC2
 
@@ -34,6 +34,7 @@ sudo nano /etc/truehire/frontend.env
 ```
 
 Use the Terraform outputs for `DATABASE_URL`, `AWS_S3_BUCKET`, and `AWS_S3_PUBLIC_URL`.
+Set `JWT_SECRET` to a random 32+ character value before starting the service; production startup intentionally fails for weak placeholders.
 
 ## 3. Build And Run
 
@@ -53,6 +54,8 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now truehire-backend truehire-frontend
 ```
 
+The backend env enables Node cluster mode with two workers by default. Increase `WEB_CONCURRENCY` only after increasing RDS capacity or lowering per-worker `DB_CONNECTION_LIMIT`.
+
 ## 4. Nginx And HTTPS
 
 ```bash
@@ -69,6 +72,7 @@ sudo certbot --nginx -d your-domain.com -d www.your-domain.com
 ```bash
 curl -I https://your-domain.com
 curl https://your-domain.com/api/health
+curl https://your-domain.com/api/health/database
 sudo systemctl status truehire-backend truehire-frontend nginx
 sudo journalctl -u truehire-backend -n 100 --no-pager
 sudo journalctl -u truehire-frontend -n 100 --no-pager

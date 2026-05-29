@@ -717,10 +717,10 @@ export default function RecruiterRegister() {
                     Return to Login
                   </a>
                   <a
-                    href="/business"
+                    href="/"
                     className="inline-flex items-center justify-center px-6 py-3 rounded-lg border border-slate-200 text-slate-700 text-sm font-semibold transition hover:bg-slate-50"
                   >
-                    Back to Business
+                    Back to Home
                   </a>
                 </div>
               </div>

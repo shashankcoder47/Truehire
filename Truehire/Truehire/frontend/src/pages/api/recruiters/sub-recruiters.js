@@ -1,6 +1,8 @@
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_ISSUER = process.env.JWT_ISSUER || 'truehire-api';
+const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'truehire-web';
 
 if (!JWT_SECRET) {
   throw new Error('Missing required environment variable: JWT_SECRET');
@@ -13,7 +15,10 @@ const verifyToken = (token) => {
       throw new Error('No token provided');
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET, {
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+    });
     return decoded;
   } catch (error) {
     console.error('Token verification error:', error);
@@ -32,7 +37,7 @@ export default async function handler(req, res) {
 
       // Verify token and get recruiter info
       const decoded = verifyToken(token);
-      if (!decoded || decoded.role !== 'recruiter') {
+      if (!decoded || String(decoded.role || '').toUpperCase() !== 'RECRUITER') {
         return res.status(401).json({ message: 'Invalid token' });
       }
 
@@ -63,7 +68,7 @@ export default async function handler(req, res) {
 
       // Verify token and get recruiter info
       const decoded = verifyToken(token);
-      if (!decoded || decoded.role !== 'recruiter') {
+      if (!decoded || String(decoded.role || '').toUpperCase() !== 'RECRUITER') {
         return res.status(401).json({ message: 'Invalid token' });
       }
 

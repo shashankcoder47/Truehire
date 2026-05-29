@@ -88,15 +88,55 @@ resource "aws_s3_bucket" "uploads" {
   tags          = local.tags
 }
 
+resource "aws_s3_bucket_ownership_controls" "uploads" {
+  bucket = aws_s3_bucket.uploads.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "uploads" {
+  bucket = aws_s3_bucket.uploads.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_versioning" "uploads" {
+  bucket = aws_s3_bucket.uploads.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "uploads" {
+  bucket = aws_s3_bucket.uploads.id
+
+  rule {
+    id     = "expire-noncurrent-upload-versions"
+    status = "Enabled"
+
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+  }
+}
+
 resource "aws_s3_bucket_public_access_block" "uploads" {
   bucket                  = aws_s3_bucket.uploads.id
   block_public_acls       = true
-  block_public_policy     = false
+  block_public_policy     = !var.uploads_public_read
   ignore_public_acls      = true
-  restrict_public_buckets = false
+  restrict_public_buckets = !var.uploads_public_read
 }
 
 resource "aws_s3_bucket_policy" "uploads_public_read" {
+  count  = var.uploads_public_read ? 1 : 0
   bucket = aws_s3_bucket.uploads.id
   policy = jsonencode({
     Version = "2012-10-17"
@@ -109,7 +149,10 @@ resource "aws_s3_bucket_policy" "uploads_public_read" {
     }]
   })
 
-  depends_on = [aws_s3_bucket_public_access_block.uploads]
+  depends_on = [
+    aws_s3_bucket_ownership_controls.uploads,
+    aws_s3_bucket_public_access_block.uploads,
+  ]
 }
 
 resource "aws_iam_role" "ec2" {
@@ -162,17 +205,25 @@ resource "aws_db_instance" "mysql" {
   identifier             = "${var.project_name}-${var.environment}-mysql"
   engine                 = "mysql"
   engine_version         = "8.0"
-  instance_class         = "db.t3.micro"
-  allocated_storage      = 20
-  max_allocated_storage  = 100
+  instance_class         = var.db_instance_class
+  allocated_storage      = var.db_allocated_storage
+  max_allocated_storage  = var.db_max_allocated_storage
+  storage_type           = "gp3"
+  storage_encrypted      = true
   db_name                = var.db_name
   username               = var.db_username
   password               = var.db_password
   db_subnet_group_name   = aws_db_subnet_group.mysql.name
   vpc_security_group_ids = [aws_security_group.rds.id]
   publicly_accessible    = false
+  multi_az               = var.db_multi_az
+  backup_retention_period = var.db_backup_retention_days
+  backup_window          = "19:00-20:00"
+  maintenance_window     = "sun:20:30-sun:21:30"
+  auto_minor_version_upgrade = true
+  copy_tags_to_snapshot  = true
   skip_final_snapshot    = false
-  deletion_protection    = true
+  deletion_protection    = var.db_deletion_protection
 
   tags = local.tags
 }
@@ -187,8 +238,9 @@ resource "aws_instance" "app" {
   associate_public_ip_address = true
 
   root_block_device {
-    volume_size = 30
+    volume_size = var.ec2_root_volume_size
     volume_type = "gp3"
+    encrypted   = true
   }
 
   tags = merge(local.tags, {

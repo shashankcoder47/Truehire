@@ -45,7 +45,12 @@ variable "ami_id" {
 
 variable "ec2_instance_type" {
   type    = string
-  default = "t3.micro"
+  default = "t3.small"
+}
+
+variable "ec2_root_volume_size" {
+  type    = number
+  default = 50
 }
 
 variable "db_username" {
@@ -64,3 +69,38 @@ variable "db_name" {
   default = "truehire"
 }
 
+variable "db_instance_class" {
+  type    = string
+  default = "db.t3.small"
+}
+
+variable "db_allocated_storage" {
+  type    = number
+  default = 50
+}
+
+variable "db_max_allocated_storage" {
+  type    = number
+  default = 200
+}
+
+variable "db_backup_retention_days" {
+  type    = number
+  default = 7
+}
+
+variable "db_multi_az" {
+  type    = bool
+  default = false
+}
+
+variable "db_deletion_protection" {
+  type    = bool
+  default = true
+}
+
+variable "uploads_public_read" {
+  type        = bool
+  default     = true
+  description = "Keep true while the app stores direct public file URLs. Set false only after adding signed download routes."
+}

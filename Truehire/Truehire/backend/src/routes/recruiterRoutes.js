@@ -26,7 +26,7 @@ import {
 } from '../validators/recruiterValidators.js';
 import { ApiError } from '../utils/apiError.js';
 import { comparePassword, hashPassword } from '../utils/password.js';
-import { uploadSingle } from '../utils/upload.js';
+import { uploadMimeTypes, uploadSingle } from '../utils/upload.js';
 
 const router = Router();
 
@@ -482,7 +482,10 @@ router.post(
   '/profile/logo',
   authenticate,
   recruiterOnly,
-  uploadSingle('logo', 'company-logos'),
+  uploadSingle('logo', 'company-logos', {
+    allowedMimeTypes: uploadMimeTypes.images,
+    maxFileSize: 2 * 1024 * 1024,
+  }),
   asyncHandler(async (req, res) => {
     const recruiterId = normalizeRecruiterId(req.auth.sub);
 
@@ -557,7 +560,10 @@ router.post(
   '/verification',
   authenticate,
   recruiterOnly,
-  uploadSingle('document', 'verification'),
+  uploadSingle('document', 'verification', {
+    allowedMimeTypes: uploadMimeTypes.documents,
+    maxFileSize: 10 * 1024 * 1024,
+  }),
   asyncHandler(async (req, res) => {
     const recruiterId = normalizeRecruiterId(req.auth.sub);
 

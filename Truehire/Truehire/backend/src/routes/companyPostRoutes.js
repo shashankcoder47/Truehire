@@ -28,7 +28,7 @@ import {
 } from '../services/companyPostService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/apiError.js';
-import { uploadArray, uploadSingle } from '../utils/upload.js';
+import { uploadArray, uploadMimeTypes, uploadSingle } from '../utils/upload.js';
 
 const router = Router();
 
@@ -79,7 +79,10 @@ router.post(
   '/recruiter/posts',
   authenticate,
   recruiterOnly,
-  uploadArray('media', 15, 'company-posts'),
+  uploadArray('media', 15, 'company-posts', {
+    allowedMimeTypes: uploadMimeTypes.media,
+    maxFileSize: 100 * 1024 * 1024,
+  }),
   asyncHandler(async (req, res) => {
     const mediaItems = validatePostMedia(getUploadedMedia(req.files));
     const post = await createRecruiterPost({
@@ -127,7 +130,10 @@ router.put(
   '/recruiter/posts/:id',
   authenticate,
   recruiterOnly,
-  uploadArray('media', 15, 'company-posts'),
+  uploadArray('media', 15, 'company-posts', {
+    allowedMimeTypes: uploadMimeTypes.media,
+    maxFileSize: 100 * 1024 * 1024,
+  }),
   asyncHandler(async (req, res) => {
     const uploadedMedia = validatePostMedia(getUploadedMedia(req.files));
     const existingMedia = parseExistingMedia(req.body.existing_media);
@@ -164,7 +170,10 @@ router.post(
   '/recruiter/statuses',
   authenticate,
   recruiterOnly,
-  uploadSingle('media', 'company-statuses'),
+  uploadSingle('media', 'company-statuses', {
+    allowedMimeTypes: uploadMimeTypes.media,
+    maxFileSize: 100 * 1024 * 1024,
+  }),
   asyncHandler(async (req, res) => {
     const status = await createRecruiterStatus({
       recruiterId: req.auth.sub,

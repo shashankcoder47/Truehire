@@ -25,6 +25,18 @@ const requireProductionValue = (name, value) => {
   return value;
 };
 
+const requireStrongProductionSecret = (name, value) => {
+  if (!isProduction) {
+    return value;
+  }
+
+  if (!value || value.length < 32 || ['change_me', 'changeme', 'secret', 'jwt_secret'].includes(value.toLowerCase())) {
+    throw new Error(`${name} must be a strong production secret of at least 32 characters`);
+  }
+
+  return value;
+};
+
 const buildDatabaseUrl = () => {
   const host = process.env.DB_HOST ?? (isProduction ? '' : '127.0.0.1');
   const provider = process.env.DB_PROVIDER ?? 'postgresql';
@@ -84,15 +96,23 @@ export const env = {
   host: process.env.HOST ?? '0.0.0.0',
   clusterEnabled: String(process.env.CLUSTER_ENABLED ?? 'false').toLowerCase() === 'true',
   workerCount: Math.max(Number(process.env.WEB_CONCURRENCY ?? process.env.WORKER_COUNT ?? 0), 0),
+  cronJobsEnabled: String(process.env.CRON_JOBS_ENABLED ?? 'true').toLowerCase() !== 'false',
   serverBacklog: Number(process.env.SERVER_BACKLOG ?? 1024),
   serverMaxConnections: Number(process.env.SERVER_MAX_CONNECTIONS ?? 0),
   keepAliveTimeout: Number(process.env.KEEP_ALIVE_TIMEOUT_MS ?? 65_000),
   headersTimeout: Number(process.env.HEADERS_TIMEOUT_MS ?? 66_000),
   requestTimeout: Number(process.env.REQUEST_TIMEOUT_MS ?? 120_000),
+  trustProxy: Number(process.env.TRUST_PROXY_HOPS ?? (isProduction ? 1 : 0)),
+  jsonBodyLimit: process.env.JSON_BODY_LIMIT ?? '1mb',
+  formBodyLimit: process.env.FORM_BODY_LIMIT ?? '1mb',
   rateLimitEnabled: String(process.env.RATE_LIMIT_ENABLED ?? 'true').toLowerCase() !== 'false',
+  rateLimitStore: process.env.RATE_LIMIT_STORE ?? (isProduction ? 'database' : 'memory'),
   loginRateLimitWindowMs: Number(process.env.LOGIN_RATE_LIMIT_WINDOW_MS ?? 60_000),
-  loginRateLimitMax: Number(process.env.LOGIN_RATE_LIMIT_MAX ?? 600),
-  jwtSecret: process.env.JWT_SECRET,
+  loginRateLimitMax: Number(process.env.LOGIN_RATE_LIMIT_MAX ?? (isProduction ? 10 : 600)),
+  jwtSecret: requireStrongProductionSecret('JWT_SECRET', process.env.JWT_SECRET),
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '2h',
+  jwtIssuer: process.env.JWT_ISSUER ?? 'truehire-api',
+  jwtAudience: process.env.JWT_AUDIENCE ?? 'truehire-web',
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? '',
   databaseUrl: buildDatabaseUrl(),
   frontendUrl: frontendUrls[0] ?? '',

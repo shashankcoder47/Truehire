@@ -16,7 +16,7 @@ import {
   updateJob,
 } from '../services/jobService.js';
 import { createNewJobPostedNotifications } from '../services/notificationService.js';
-import { uploadSingle } from '../utils/upload.js';
+import { uploadMimeTypes, uploadSingle } from '../utils/upload.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import {
   applyJobSchema,
@@ -194,7 +194,10 @@ router.post(
   '/',
   authenticate,
   recruiterOnly,
-  uploadSingle('company_logo', 'company-logos'),
+  uploadSingle('company_logo', 'company-logos', {
+    allowedMimeTypes: uploadMimeTypes.images,
+    maxFileSize: 2 * 1024 * 1024,
+  }),
   normalizeCreateJobRequest,
   validateRequest({ body: createJobSchema }),
   asyncHandler(async (req, res) => {
@@ -262,7 +265,10 @@ router.post(
   '/:jobId/apply',
   authenticate,
   userOnly,
-  uploadSingle('resume', 'resumes'),
+  uploadSingle('resume', 'resumes', {
+    allowedMimeTypes: uploadMimeTypes.documents,
+    maxFileSize: 10 * 1024 * 1024,
+  }),
   validateRequest({ params: jobIdParamSchema, body: applyJobSchema }),
   asyncHandler(async (req, res) => {
     const application = await applyToJob(

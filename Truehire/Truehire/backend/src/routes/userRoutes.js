@@ -12,7 +12,7 @@ import {
 import { getProfile, updateProfilePhoto, updateProfileResume, upsertProfile } from '../services/userService.js';
 import { getFollowList, getFollowStats } from '../services/followService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { uploadSingle } from '../utils/upload.js';
+import { uploadMimeTypes, uploadSingle } from '../utils/upload.js';
 import { updateUserProfileSchema } from '../validators/userValidators.js';
 
 const router = Router();
@@ -211,7 +211,10 @@ router.get(
 router.put(
   '/profile/photo',
   authenticate,
-  uploadSingle('photo', 'profile-images'),
+  uploadSingle('photo', 'profile-images', {
+    allowedMimeTypes: uploadMimeTypes.images,
+    maxFileSize: 2 * 1024 * 1024,
+  }),
   asyncHandler(async (req, res) => {
     if (!req.file) {
       return res.status(400).json({
@@ -243,7 +246,10 @@ router.put(
 router.post(
   '/profile/resume',
   authenticate,
-  uploadSingle('resume', 'resumes'),
+  uploadSingle('resume', 'resumes', {
+    allowedMimeTypes: uploadMimeTypes.documents,
+    maxFileSize: 10 * 1024 * 1024,
+  }),
   asyncHandler(async (req, res) => {
     if (!req.file) {
       return res.status(400).json({
@@ -286,7 +292,10 @@ router.post(
 router.post(
   '/profile/certification-document',
   authenticate,
-  uploadSingle('document', 'certification-documents'),
+  uploadSingle('document', 'certification-documents', {
+    allowedMimeTypes: uploadMimeTypes.documents,
+    maxFileSize: 10 * 1024 * 1024,
+  }),
   asyncHandler(async (req, res) => {
     if (!req.file) {
       return res.status(400).json({

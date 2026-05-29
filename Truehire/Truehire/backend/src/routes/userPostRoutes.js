@@ -14,7 +14,7 @@ import {
 } from '../services/userPostService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/apiError.js';
-import { uploadArray } from '../utils/upload.js';
+import { uploadArray, uploadMimeTypes } from '../utils/upload.js';
 
 const router = Router();
 
@@ -51,7 +51,10 @@ router.post(
   uploadArray([
     { name: 'media', maxCount: 15 },
     { name: 'media[]', maxCount: 15 },
-  ], 15, 'user-posts'),
+  ], 15, 'user-posts', {
+    allowedMimeTypes: uploadMimeTypes.media,
+    maxFileSize: 100 * 1024 * 1024,
+  }),
   asyncHandler(async (req, res) => {
     const post = await createUserPost({
       userId: req.auth.sub,

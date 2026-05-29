@@ -28,7 +28,14 @@ const configureServer = (server) => {
 
 const startHttpServer = async () => {
   await connectDatabase();
-  startWeeklyJobAlertCron();
+
+  const shouldStartCronJobs =
+    env.cronJobsEnabled &&
+    (!cluster.isWorker || cluster.worker?.id === 1);
+
+  if (shouldStartCronJobs) {
+    startWeeklyJobAlertCron();
+  }
 
   const server = http.createServer(app);
   configureServer(server);

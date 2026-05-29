@@ -1,5 +1,6 @@
 import cors from 'cors';
 import express from 'express';
+import helmet from 'helmet';
 import path from 'node:path';
 import { env } from './config/env.js';
 import recruiterRoutes from './routes/recruiterRoutes.js';
@@ -13,6 +14,17 @@ import { ensureUploadsDirectory } from './utils/upload.js';
 const app = express();
 
 ensureUploadsDirectory();
+app.disable('x-powered-by');
+
+if (env.trustProxy > 0) {
+  app.set('trust proxy', env.trustProxy);
+}
+
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }),
+);
 
 const allowedOrigins = new Set(env.frontendUrls);
 const isDevelopment = env.nodeEnv !== 'production';
@@ -42,8 +54,8 @@ app.use(
   }),
 );
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: env.jsonBodyLimit }));
+app.use(express.urlencoded({ extended: true, limit: env.formBodyLimit }));
 if (!env.awsS3Bucket) {
   app.use('/uploads', express.static(path.resolve(env.uploadsDir)));
 }
@@ -52,6 +64,8 @@ const loginRateLimiter = createRateLimiter({
   windowMs: env.loginRateLimitWindowMs,
   maxRequests: env.loginRateLimitMax,
   enabled: env.rateLimitEnabled,
+  store: env.rateLimitStore,
+  scope: 'login',
 });
 
 app.use('/api/auth/login', loginRateLimiter);
